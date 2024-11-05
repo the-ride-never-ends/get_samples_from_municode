@@ -1,0 +1,11 @@
+private_config.yaml
+debug_logs/*
+!debug_logs/_debug_logs_go_here.txt
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.Identifier
+*.csv
+*.html
+*.zip

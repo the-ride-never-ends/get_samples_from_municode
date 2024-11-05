@@ -1,0 +1,19 @@
+[submodule "config"]
+    path = config/
+    url = https://github.com/the-ride-never-ends/config
+    branch = get_samples_from_municode
+
+[submodule "logger"]
+    path = logger/
+    url = https://github.com/the-ride-never-ends/logger
+    branch = get_samples_from_municode
+
+[submodule "utils"]
+    path = utils/
+    url = https://github.com/the-ride-never-ends/utils
+    branch = get_samples_from_municode
+
+[submodule "web_scraper"]
+    path = web_scraper
+    url = https://github.com/the-ride-never-ends/web_scraper
+    branch = get_samples_from_municode
