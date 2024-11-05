@@ -1,2 +1,4 @@
 multipledispatch
 pyyaml
+pandas
+tdqm

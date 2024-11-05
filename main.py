@@ -17,12 +17,12 @@ from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
 
-def get_urls_from_csv_via_pandas(csv_file_path: str) -> pd.DataFrame:
+def load_from_csv_via_pandas(csv_file_path: str, header: list[str]) -> pd.DataFrame:
     """
     Step 1. Get 30 URLs from CSV
     """
-    # Load in CSV file
-    return pd.read_csv(csv_file_path)
+    # Load in CSV file using pandas
+    return pd.read_csv(csv_file_path, header=header)
 
 
 def go_to_url(url: str, pw_instance) -> None:
@@ -67,28 +67,42 @@ def  get_total_size_of_html_files(directory: str) -> int:
     Step 9. Get the total size of the HTML documents in the HTML directory.
     """
 
+from config.config import RANDOM_SEED
+from web_scraper.sites.municode.library.ScrapeMunicodePage import ScrapeMunicodePage
 
 async def main():
 
     logger.info("Begin __main__")
 
-    next_step("Step 1. Get 30 URLs from the CSV.")
+    next_step("Step 1. Get URLs from the CSV.")
+    expected_headers = ["gnis, place_name, url"]
+    urls_df: pd.DataFrame = load_from_csv_via_pandas(csv_file_path="input_urls.csv", expected_headers=expected_headers)
 
-    next_step("Step 2. Go to each URL.")
+    next_step("Step 2. Scrape each URL.")
+    async with async_playwright() as pw_instance:
+        scraper: ScrapeMunicodePage = ScrapeMunicodePage.start(pw_instance=pw_instance, headless=False)
+        for row in urls_df.itertuples():
 
-    next_step("Step 3. Count number of top-level menu elements and save to txt file.")
+            next_step("Step 2.1 Go to each URL.")
+            await scraper.navigate_to(url=row.url)
 
-    next_step("Step 4. Randomly select top-level menu element and click on it.")
+            next_step("Step 2.2 Count number of top-level menu elements and save to txt file.")
+            await scraper.count_top_level_menu_elements()
 
-    next_step("Step 5. Walk to the bottom of the nested menu element, if applicable. Perform counts of each recursive element along the way.")
+            next_step("Step 2.3 Randomly select top-level menu element and click on it.")
+            await scraper.randomly_select_top_level_menu_element(seed=RANDOM_SEED)
 
-    next_step("Step 6. When bottom of subnodes folder is reached, randomly select an element to get to the final URL.")
-              
-    next_step("Step 7. Download the HTML of the final URL to disk.")
+            next_step("Step 2.4 Walk to the bottom of the nested menu element, if applicable. Perform counts of each recursive element along the way.")
+            await scraper.walk_nested_menu_element()
 
-    next_step("Step 8. Repeat steps 2-8 for each URL.")
+            next_step("Step 2.5 When bottom of subnodes folder is reached, randomly select an element to get to the final URL.")
+            await scraper.randomly_select_final_url(seed=RANDOM_SEED)
+            
+            next_step("Step 2.6 Download the HTML of the final URL to disk.")
+            await scraper.download_html_to_disk(directory="output")
+        await scraper.exit()
 
-    next_step("Step 9. Get the total size of the HTML documents in the HTML directory.")
+    next_step("Step 3. Get the total size of the HTML documents in the HTML directory.")
 
     logger.info("End __main__")
 

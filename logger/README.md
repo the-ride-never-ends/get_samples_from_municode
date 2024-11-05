@@ -21,7 +21,7 @@ This module requires the following external libraries:
 ## Usage
 To use this module, import it as follows:
 ```python
-from logger import Logger
+from logger.logger import Logger
 logger = Logger(logger_name="my_app")
 
 logger.info("Application started")

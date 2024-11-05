@@ -16,7 +16,7 @@ from playwright.async_api import (
 )
 
 
-from scraper.child_classes.playwright.AsyncPlaywrightScrapper import AsyncPlaywrightScrapper
+from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScrapper
 
 
 from utils.shared.make_sha256_hash import make_sha256_hash
@@ -36,9 +36,6 @@ output_folder = os.path.join(OUTPUT_FOLDER, "get_sidebar_urls_from_municode")
 if not os.path.exists(output_folder):
     print(f"Creating output folder: {output_folder}")
     os.mkdir(output_folder)
-
-
-
 
 
 class ScrapeMunicodePage(AsyncPlaywrightScrapper):
@@ -62,19 +59,21 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
         self.output_folder:str = output_folder
         self.place_name:str = None
 
-
     async def screen_shot_frontpage(self, page):
         """
         Take a screenshot of the frontpage
         """
-        await self.navigate_to_url(page, self.domain)
+
+        await self.navigate_to(page, self.domain)
         await self.page.screenshot(path=os.path.join(self.output_folder, f"{self.place_name}_frontpage.png"))
 
-    async def scrape(self):
+    async def count_top_level_menu_elements(self):
         """
-        
+        Get the top-level node elements from the Table of Contents.
         """
 
+    async def randomly_select_top_level_menu_element(self, page):
+        pass
 
 
 class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
@@ -110,7 +109,7 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         Figure out what kind of front page we're on. If it's a regular page, return it.
         """
         # See whether or not the ToC button is on the page.
-        locator = self.page.locator("")
+        locator: Locator = self.page.locator("")
         toc_button_locator = await self.page.get_by_text("Browse table of contents")
         expect(toc_button_locator).to_be_visible()
 

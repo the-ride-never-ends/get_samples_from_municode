@@ -30,7 +30,7 @@ This module requires the following external libraries:
 ## Usage
 To use this module, import it as follows:
 ```python
-from web_scraper.playwright.async_scraper.async_playwright_scraper import AsyncPlaywrightScrapper
+from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScrapper
 
 scraper = await AsyncPlaywrightScrapper(user_agent="My Web Scraper").start()
 

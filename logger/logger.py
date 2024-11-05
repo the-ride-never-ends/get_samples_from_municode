@@ -20,7 +20,7 @@ Key features:
 - Support for both file and console logging
 
 Usage:
-    from logger import Logger
+    from logger.logger import Logger
     logger = Logger(logger_name="my_app")
     logger.info("Application started")
     logger.debug("Debug information")
@@ -115,7 +115,7 @@ class Logger:
         exception(message, f=False, q=True): Log a message with severity 'ERROR', including exception information.
 
     Example:
-        >>> from logger import Logger
+        >>> from logger.logger import Logger
         >>> filename = __name__ # example.py
         >>> logger = Logger(logger_name=filename)
         >>> logger.info("Hello world!") # line 4

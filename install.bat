@@ -29,5 +29,15 @@ if exist requirements.txt (
     echo requirements.txt not found. Skipping package installation.
 )
 
+REM Install submodules in editable mode
+echo Checking for submodules in subdirectories...
+for /d %%D in (*) do (
+    if exist "%%D\pyproject.toml" (
+        echo Found pyproject.toml in %%D
+        echo Installing required packages for %%D...
+        pip install -e "%%D"
+    )
+)
+
 echo Setup complete!
 timeout /t 30

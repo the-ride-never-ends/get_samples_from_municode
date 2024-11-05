@@ -1,0 +1,6 @@
+aiohttp
+pandas
+playwright
+requests
+pyyaml
+stdlib-list
