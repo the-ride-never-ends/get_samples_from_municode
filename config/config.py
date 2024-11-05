@@ -9,6 +9,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 PROJECT_ROOT = script_dir = os.path.dirname(script_dir)
 MAIN_FOLDER = os.path.dirname(script_dir)
 YEAR_IN_DAYS: int = 365
+RANDOM_SEED: int = 420
 DEBUG_FILEPATH: str = os.path.join(MAIN_FOLDER, "debug_logs")
 
 # Get YAML config variables
