@@ -234,7 +234,7 @@ class Logger:
         self.logger.info("Graceful shutdown completed")
         sys.exit(0)
 
-    def _cleanup(self, signum: int, frame) -> None:
+    def _cleanup(self) -> None:
         """
         Cleanup logging resources on exit.
         """

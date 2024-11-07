@@ -26,9 +26,9 @@ from abc import ABC, abstractmethod
 
 
 
-from utils.manual.scrape_legal_websites_utils.fetch_robots_txt import fetch_robots_txt
-from utils.manual.scrape_legal_websites_utils.parse_robots_txt import parse_robots_txt 
-from utils.manual.scrape_legal_websites_utils.extract_urls_using_javascript import extract_urls_using_javascript
+# from utils.manual.scrape_legal_websites_utils.fetch_robots_txt import fetch_robots_txt
+# from utils.manual.scrape_legal_websites_utils.parse_robots_txt import parse_robots_txt 
+# from utils.manual.scrape_legal_websites_utils.extract_urls_using_javascript import extract_urls_using_javascript
 from utils.manual.scrape_legal_websites_utils.can_fetch import can_fetch
 from utils.shared.decorators.try_except import try_except
 
@@ -53,7 +53,7 @@ from urllib.robotparser import RobotFileParser
 from urllib.error import URLError
 from urllib.parse import urljoin
 
-from .AbstractBrowserController import AsyncAbstractBrowserController, SyncAbstractBrowserController
+from .async_abstract_browser_controller import AsyncAbstractBrowserController, SyncAbstractBrowserController
 
 from playwright.async_api import (
     async_playwright,

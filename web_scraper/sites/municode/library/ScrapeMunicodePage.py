@@ -1,5 +1,6 @@
 import asyncio
 from collections import deque
+import random
 import re
 import time
 from typing import NamedTuple
@@ -21,8 +22,8 @@ from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrig
 
 from utils.shared.make_sha256_hash import make_sha256_hash
 from utils.shared.sanitize_filename import sanitize_filename
-from utils.shared.decorators.adjust_wait_time_for_execution import adjust_wait_time_for_execution, async_adjust_wait_time_for_execution
-from utils.shared.load_from_csv import load_from_csv
+from utils.shared.decorators.adjust_wait_time_for_execution import adjust_wait_time_for_execution
+# from utils.shared.load_from_csv import load_from_csv
 from utils.shared.save_to_csv import save_to_csv
 from utils.shared.decorators.try_except import try_except, async_try_except
 
@@ -36,6 +37,7 @@ output_folder = os.path.join(OUTPUT_FOLDER, "get_sidebar_urls_from_municode")
 if not os.path.exists(output_folder):
     print(f"Creating output folder: {output_folder}")
     os.mkdir(output_folder)
+
 
 
 class ScrapeMunicodePage(AsyncPlaywrightScrapper):
@@ -72,8 +74,273 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
         Get the top-level node elements from the Table of Contents.
         """
 
-    async def randomly_select_top_level_menu_element(self, page):
-        pass
+    # async def randomly_select_top_level_menu_element(self, seed):
+    #     # Set the random seed for reproducibility
+    #     random.seed(seed)
+
+    #     # Wait for the top-level menu elements to be visible
+    #     top_level_toc_button_id = # 'li[depth="0"][id^="genToc_"] .toc-text' '[id^="genToc_"]'
+    #     # await self.page.get_by_role("button", name="Table of Contents").click()
+    #     await self.page.wait_for_selector(top_level_toc_button_id, state='visible')
+
+    #     # Get all elements with IDs starting with "genToc_"
+    #     anchor_elements = await self.page.query_selector_all(top_level_toc_button_id)
+    #     logger.debug(f"anchor_elements: {anchor_elements}")
+
+    #     if not anchor_elements:
+    #         raise Exception("No top-level menu elements found")
+
+    #     # Randomly select one of the top-level elements
+    #     selected_element = random.choice(anchor_elements)
+
+    #     # Get the text content of the selected element
+    #     element_text = await selected_element.text_content()
+        
+    #     # Get the href attribute of the selected element
+    #     element_href = await selected_element.get_attribute('href')
+
+    #     # Click the selected element
+    #     await selected_element.click()
+
+    #     # Log the selection
+    #     logger.info(f"Randomly selected top-level menu element: '{selected_element}'\ntext: '{element_text}\nhref: '{element_href}'")
+
+    #     # Return the selected element for further use if needed
+    #     return selected_element, element_text, element_href
+
+
+
+    # # Example ways to inspect a JSHandle
+    # async def inspect_handle(self, idx, handle):
+    #     # Get all properties
+    #     properties = await handle.evaluate('''node => ({
+    #         tagName: node.tagName,
+    #         id: node.id,
+    #         className: node.className,
+    #         textContent: node.textContent,
+    #         attributes: Array.from(node.attributes).map(attr => ({
+    #             name: attr.name,
+    #             value: attr.value
+    #         }))
+    #     })''')
+        
+    #     # Or get specific attributes
+    #     href = await handle.get_attribute('href')
+    #     text = await handle.text_content()
+        
+    #     logger.info(f"Element {idx}\nProperties: {properties}\nhref: {href}\ntext: {text}")
+
+
+    async def randomly_select_top_level_menu_element(self, seed):
+        """
+        Randomly selects and clicks a top-level menu element from a Municode page.
+        
+        Args:
+            seed (int): Random seed for reproducibility
+            
+        Returns:
+            tuple: (selected_element, element_text, element_href)
+        """
+        # Set the random seed for reproducibility
+        random.seed(seed)
+
+        try:
+            # Wait for the top-level menu elements to be visible
+            # Modified selector to target the actual clickable elements more precisely
+            node_id_selector  = 'a[href*="?nodeId="]' # NOTE This selector works.
+            await self.page.wait_for_selector(node_id_selector , state='visible', timeout=10000)
+
+            # Get all elements with the modified selector
+            anchor_elements  = await self.page.query_selector_all(node_id_selector)
+            logger.debug(f"Found {len(anchor_elements)} anchor elements")
+            logger.debug(f"anchor_elements: {anchor_elements}")
+
+            if not anchor_elements:
+                raise Exception("No anchor elements found")
+
+
+            # Filter these elements based on the genToc_ regex
+            filtered_elements = await self.page.evaluate('''
+                (anchors) => {
+                    const regex = new RegExp('^genToc_.*');  // Example regex for IDs
+                    return anchors.filter(anchor => {
+                        // Check if the parent element's ID matches the regex
+                        return regex.test(anchor.parentElement.id);
+                    }).map(anchor => ({
+                        href: anchor.href,
+                        text: anchor.textContent,
+                        parentId: anchor.parentElement.id
+                    }));
+                }
+            ''', anchor_elements)
+            logger.debug(f"filtered_elements len: {len(filtered_elements)}\nfiltered_elements: {filtered_elements}")
+
+
+            # Recursive clicking.
+            clicked_buttons = set()
+            growth = 0
+            for idx, element in enumerate(filtered_elements, start=1):
+                try:
+                    click_button_results = await self.page.evaluate('''
+                        async (anchors) => {
+                            const regex = new RegExp('^genToc_.*');  // Example regex for IDs
+                            const clickedButtons = [];
+                            
+                            for (const anchor of anchors) {
+                                if (regex.test(anchor.parentElement.id)) {
+                                    // Look for a button within the same parent element
+                                    const button = anchor.parentElement.querySelector('button');
+                                    if (button) {
+                                        await button.click();  // Click the button if found
+                                        clickedButtons.push({
+                                            href: anchor.href,
+                                            parentId: anchor.parentElement.id,
+                                            buttonText: button.textContent.trim()
+                                        });
+                                    }
+                                }
+                            }
+                            return clickedButtons;
+                        }
+                    ''', element)
+                    clicked_buttons.update(click_button_results)
+                    growth += len(clicked_buttons)
+                    logger.info(f"Sweep {idx} found {growth} buttons. Clicking again...")
+
+            except AsyncPlaywrightTimeoutError as e:
+                logger.error(f"Timeout error occurred for click_button_results: {e}")
+            # logger.debug(f"click_button_results len: {len(click_button_results)}\nclick_button_results: {click_button_results}", t=30)
+
+            # Read JavaScript from a file
+            js_filepath = os.path.join(os.path.dirname(__file__), 'expandAndGather.js')
+            with open(js_filepath, 'r') as file:
+                expand_and_gather_js = file.read()
+            
+            # Recursively click all the nodes.
+            expand_and_gather_results = await self.page.evaluate(expand_and_gather_js, anchor_elements)
+            logger.debug(f"expand_and_gather_results len: {len(expand_and_gather_results)}\expand_and_gather_results: {expand_and_gather_results}", t=30)
+            # Once all the icons are clicked, we can just get all the HTML from the page.
+            # This should also return how many nodes we clicked
+            results = await self.page.inner_html('body')
+
+
+
+            # for idx, anchor in enumerate(anchor_elements, start=1):
+            #     # Debug: Inspect the first anchor
+            #     # element_details = await anchor.evaluate('''anchor => ({
+            #     #     tagName: anchor.tagName,
+            #     #     href: anchor.href,
+            #     #     text: anchor.textContent,
+            #     #     className: anchor.className,
+            #     #     hasParentLi: !!anchor.closest('li[depth="0"]'),
+            #     #     hasButton: !!anchor.closest('li[depth="0"]')?.querySelector('button[role="button"]')
+            #     # })''')
+            #     element_details = await self.page.evaluate('''
+            #         anchor => {
+            #             // Initialize details object for the anchor
+            #             const details = {
+            #                 tagName: anchor.tagName,
+            #                 href: anchor.href,
+            #                 text: anchor.textContent.trim(),
+            #                 className: anchor.className,
+            #                 hasParentLi: !!anchor.closest('li[depth="0"]'),
+            #                 hasButton: false
+            #             };
+            #             const regex = new RegExp('^genToc_.*');
+            #             const matchingElements = [];
+            #                 .forEach(element => {
+            #                 if (regex.test(element.id)) {
+            #                     const buttons = element.querySelectorAll('button');
+            #                     buttons.forEach(button => matchingElements.push(button));
+            #                 }
+            #             });
+                                                           
+
+            #             const li = !!anchor.closest('li[depth="0"]');
+            #             if (li) {
+            #                 console.log('Found element in li')
+            #                 console.log(details)
+            #                 details.hasParentLi = true;
+            #                 // Look for button within the li
+            #                 const button = li.querySelector('.toc-button-expand, button.toggle-node-button');
+            #                 if (button) {
+            #                     details.hasButton = true;
+            #                     details.buttonClass = button.className;
+            #                     details.buttonRole = button.getAttribute('role');
+            #                 }
+            #             }
+                        
+            #             return details;
+            #         }
+            #     ''', anchor)
+            #     logger.debug(f"{idx} anchor details: {element_details}")
+                #await self.inspect_handle(idx, anchor)
+
+            #genToc_TIT1GEPR > button
+            #     # Get the containing list item (parent or ancestor with depth="0")
+            #     parent_li: bool = await anchor.evaluate('''
+            #         anchor => { 
+            #             anchor.closest('li[depth="0"]')
+            #             return li ? true : false;
+            #         }
+            #     ''')
+            #     logger.info(f"selected_li: {parent_li}")
+
+            #     if not parent_li:
+            #         logger.debug(f"Skipping anchor {idx} as it's not a top-level menu item")
+            #         continue
+            #     else:
+            #         # Find the button within the same list item
+            #         button_exists = await anchor.evaluate('''
+            #             anchor => {
+            #                 const li = anchor.closest('li[depth="0"]');
+            #                 const button = li.querySelector('button[role="button"]');
+            #                 return button ? true : false;
+            #             }
+            #         ''')
+
+            #         if button_exists:
+            #             valid_elements.append(anchor)
+            #             logger.error(f"Found button for anchor {idx}")
+            #             continue
+        
+            # logger.info(f"Found {len(valid_elements)} anchor elements in li with a button")
+            # output_list = []
+            # for element in valid_elements:
+            #     element: ElementHandle
+            #     logger.info(f"Valid element: {element}")
+
+            #     # Make sure the element is in view before clicking
+            #     await element.scroll_into_view_if_needed()
+                
+            #     # Add a small delay to ensure the element is properly rendered
+            #     await self.page.wait_for_timeout(500)
+
+            #     # Click the element and wait for navigation if needed
+            #     try:
+            #         await element.click()
+            #         # Optionally wait for any navigation or content update
+            #         await self.page.wait_for_load_state('networkidle', timeout=5000)
+            #     except Exception as e:
+            #         logger.warning(f"Click failed, attempting JavaScript click: {str(e)}")
+            #         await self.page.evaluate('element => element.click()', element)
+            #         element_text = await element.text_content()
+            #         element_href = await element.get_attribute('href')
+
+            #     logger.info(
+            #         f"Successfully selected top-level menu element:\n"
+            #         f"Text: '{element_text}'\n"
+            #         f"Href: '{element_href}'"
+            #     )
+            #     output_list.append((element, element_text, element_href))
+            # return output_list 
+
+        except Exception as e:
+            logger.error(f"Error in randomly_select_top_level_menu_element: {str(e)}")
+            raise
+
+
+
 
 
 class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
@@ -109,8 +376,7 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         Figure out what kind of front page we're on. If it's a regular page, return it.
         """
         # See whether or not the ToC button is on the page.
-        locator: Locator = self.page.locator("")
-        toc_button_locator = await self.page.get_by_text("Browse table of contents")
+        toc_button_locator: Locator = await self.page.get_by_text("Browse table of contents")
         expect(toc_button_locator).to_be_visible()
 
         #         <div class="col-sm-6 hidden-md hidden-lg hidden-xl" style="margin-top: 8px;">
@@ -262,18 +528,18 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         return 
 
 
-    def _skip_if_we_have_url_already(self, url: str) -> list[dict]|None:
-        """
-        Check if we already have a CSV file of the input URL. 
-        If we do, load it as a list of dictionaries and return it. Else, return None
-        """
-        url_file_path = os.path.join(OUTPUT_FOLDER, f"{sanitize_filename(url)}.csv")
-        if os.path.exists(url_file_path):
-            logger.info(f"Got URL '{url}' already. Loading csv...")
-            output_dict = load_from_csv(url_file_path)
-            return output_dict
-        else:
-            return None
+    # def _skip_if_we_have_url_already(self, url: str) -> list[dict]|None:
+    #     """
+    #     Check if we already have a CSV file of the input URL. 
+    #     If we do, load it as a list of dictionaries and return it. Else, return None
+    #     """
+    #     url_file_path = os.path.join(OUTPUT_FOLDER, f"{sanitize_filename(url)}.csv")
+    #     if os.path.exists(url_file_path):
+    #         logger.info(f"Got URL '{url}' already. Loading csv...")
+    #         output_dict = load_from_csv(url_file_path)
+    #         return output_dict
+    #     else:
+    #         return None
 
 
     async def get_page_version(self) -> bool:
@@ -322,9 +588,9 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         place_id = f"{place_name}_{row.gnis}"
 
         # Skip the webpage if we already got it.
-        output_dict = self._skip_if_we_have_url_already(input_url)
-        if output_dict:
-            return output_dict
+        # output_dict = self._skip_if_we_have_url_already(input_url)
+        # if output_dict:
+        #     return output_dict
 
         output_dict = {
             'url_hash': row.url_hash, 

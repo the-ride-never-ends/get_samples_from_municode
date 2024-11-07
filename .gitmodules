@@ -1,8 +1,3 @@
-# [submodule "config"]
-#     path = config/
-#     url = https://github.com/the-ride-never-ends/config
-#     branch = get_samples_from_municode
-
 [submodule "logger"]
     path = logger/
     url = https://github.com/the-ride-never-ends/logger

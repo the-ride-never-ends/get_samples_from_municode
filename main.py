@@ -11,18 +11,18 @@ from playwright.async_api import async_playwright
 from utils.shared.next_step import next_step
 from utils.shared.sanitize_filename import sanitize_filename
 
-from config.config import *
+from config.config import INPUT_FOLDER
 
 from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
 
-def load_from_csv_via_pandas(csv_file_path: str, header: list[str]) -> pd.DataFrame:
+def load_from_csv_via_pandas(csv_file_path: str, header_line: int, name: list[str]) -> pd.DataFrame:
     """
     Step 1. Get 30 URLs from CSV
     """
-    # Load in CSV file using pandas
-    return pd.read_csv(csv_file_path, header=header)
+    # Load in CSV file using pandas, getting header names from the first line
+    return pd.read_csv(os.path.join(INPUT_FOLDER, csv_file_path))
 
 
 def go_to_url(url: str, pw_instance) -> None:
@@ -75,13 +75,15 @@ async def main():
     logger.info("Begin __main__")
 
     next_step("Step 1. Get URLs from the CSV.")
-    expected_headers = ["gnis, place_name, url"]
-    urls_df: pd.DataFrame = load_from_csv_via_pandas(csv_file_path="input_urls.csv", expected_headers=expected_headers)
+    name = ["gnis, place_name, url"]
+    header_line = 0
+    urls_df: pd.DataFrame = load_from_csv_via_pandas("input_urls.csv", header_line, name)
 
     next_step("Step 2. Scrape each URL.")
     async with async_playwright() as pw_instance:
-        scraper: ScrapeMunicodePage = ScrapeMunicodePage.start(pw_instance=pw_instance, headless=False)
+        scraper: ScrapeMunicodePage = await ScrapeMunicodePage.start(domain="https://municode.com/", pw_instance=pw_instance, headless=False)
         for row in urls_df.itertuples():
+            logger.info(f"Processing URL: {row.url}")
 
             next_step("Step 2.1 Go to each URL.")
             await scraper.navigate_to(url=row.url)

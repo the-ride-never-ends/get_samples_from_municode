@@ -5,7 +5,6 @@ import pandas as pd
 
 
 from logger.logger import Logger
-from config.config import CSV_OUTPUT_FOLDER
 
 
 def save_list_of_dicts_to_csv_via_pandas(list_of_dicts: list[dict],
@@ -48,7 +47,7 @@ def save_list_of_dicts_to_csv_via_pandas(list_of_dicts: list[dict],
 
     # Export list_of_dicts to a CSV file.
     pd.DataFrame().from_records(list_of_dicts).to_csv(filepath, index=index)
-    logger.info(f"{filepath} saved to {CSV_OUTPUT_FOLDER}.")
+    logger.info(f"Saved list_of_dicts to {filepath}.")
 
     if return_df:
         return pd.DataFrame().from_records(list_of_dicts)

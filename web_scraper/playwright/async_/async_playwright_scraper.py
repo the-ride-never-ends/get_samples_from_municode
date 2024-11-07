@@ -88,7 +88,10 @@ class AsyncPlaywrightScrapper:
 
         # Create the output directory if it doesn't exist.
         if not os.path.exists(self.output_dir):
-            os.mkdir(os.path.dirname(self.output_dir))
+            try:
+                os.mkdir(os.path.dirname(self.output_dir))
+            except FileExistsError:
+                pass
 
         # Get the robots.txt properties and assign them.
         self.rp: RobotFileParser = None
@@ -303,7 +306,7 @@ class AsyncPlaywrightScrapper:
 
         # Wait per the robots.txt crawl delay.
         if self.crawl_delay > 0:
-            if idx > 1:
+            if idx is not None and idx > 1:
                 logger.info(f"Sleeping for {self.crawl_delay} seconds to respect robots.txt crawl delay")
                 await asyncio.sleep(self.crawl_delay)
 
