@@ -40,7 +40,7 @@ class NodeData:
     depth: int = 0
 
 
-class WalkNestedMunicodeMenu:
+class WalkMunicodeToc:
     """
     Traverse nested menu structures using Playwright.
     NOTE: This is specifically made for Municode's nested menu structure, and may not work for other websites.

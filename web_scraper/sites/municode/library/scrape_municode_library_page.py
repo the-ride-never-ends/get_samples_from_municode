@@ -14,7 +14,7 @@ from playwright.async_api import (
 
 
 from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScrapper
-from .walk_nested_municode_menu import WalkNestedMunicodeMenu
+from .table_of_contents.walk_municode_toc import WalkMunicodeToc
 
 from utils.shared.make_sha256_hash import make_sha256_hash
 from utils.shared.sanitize_filename import sanitize_filename
@@ -28,9 +28,13 @@ from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
 
-class ScrapeMunicodePage(AsyncPlaywrightScrapper):
+class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
     """
-    Scrape a Municode library page
+    Scrape a Municode library page.
+    This class is gets 3 important elements from the page:
+    1. The table of contents
+    2. The versions of codes
+    3. The list of documents
     """
 
     NODE_ID_SELECTOR  = 'a[href*="?nodeId="]' # NOTE This selector works.
@@ -43,7 +47,7 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
                 **kwargs):
         super().__init__(domain, pw_instance, *args, user_agent=user_agent, **kwargs)
 
-        output_folder = os.path.join(OUTPUT_FOLDER, "scrape_municode_page")
+        output_folder = os.path.join(OUTPUT_FOLDER, "scrape_municode_library_page")
         if not os.path.exists(output_folder):
             print(f"Creating output folder: {output_folder}")
             os.mkdir(output_folder)
@@ -77,16 +81,6 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
             logger.error(f"Error selecting top-level node elements with root_selector {self.NODE_ID_SELECTOR}: {e}")
         
         return count_list
-
-
-    def randomly_select_final_url(self, df: pd.DataFrame, seed: int) -> str:
-        """
-        Returns a random URL from a pandas DataFrame based on an input seed.
-        """
-        random.seed(seed)
-        selected_index = random.randint(0, len(df) - 1)
-        selected_url = df.loc[selected_index, 'url']
-        return selected_url
 
 
     async def download_html_to_disk(self, url: str) -> None:
@@ -130,12 +124,10 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
 
         try:
             # Wait for the top-level menu elements to be visible
-            # Modified selector to target the actual clickable elements more precisely
             await self.page.wait_for_selector(self.NODE_ID_SELECTOR , state='visible', timeout=10000)
 
-            # Get all elements with the modified selector
             # Create walk instance
-            walk = WalkNestedMunicodeMenu(self.page, self.place_name, self.output_folder)
+            walk = WalkMunicodeToc(self.page, self.place_name, self.output_folder)
 
             # Walk the nested menu and save the results.
             df: pd.DataFrame = await walk.nested_menu(self.NODE_ID_SELECTOR)
@@ -164,9 +156,6 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
 class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
     """
     Get the sidebar elements from a Municode URL page.
-    NOTE This uses Playwright rather than Selenium.
-    Using a synchronous library to deal with asynchronous JavaScript is more trouble than it's worth.
-    Also, fuck multiple libraries.
     """
 
     def __init__(self,
@@ -200,8 +189,8 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
 
     async def is_regular_municode_page(self) -> bool:
         # Define the selector for the button.
-        # As the all 'regular' pages on Municode have a sidebar, 
-        # we can use the presence of the sidebar to determine if we're on a 'regular' page.
+            # As the all 'regular' pages on Municode have a sidebar, 
+            # we can use the presence of the sidebar to determine if we're on a 'regular' page.
         button_selector = '#codebankToggle button[data-original-title="CodeBank"]'
 
         # Wait 5 seconds for the button to be visible

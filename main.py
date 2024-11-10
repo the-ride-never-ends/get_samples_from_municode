@@ -14,14 +14,16 @@ from utils.shared.sanitize_filename import sanitize_filename
 from utils.shared.get_total_size_of_files_with_specified_type_in_gigabytes import (
     get_total_size_of_files_with_specified_type_in_gigabytes
 )
+from utils.shared.randomly_select_value_from_pandas_dataframe_column import (
+    randomly_select_value_from_pandas_dataframe_column
+)
 
-from web_scraper.sites.municode.library.scrape_municode_page import ScrapeMunicodePage
+from web_scraper.sites.municode.library.scrape_municode_library_page import ScrapeMunicodeLibraryPage
 
 from config.config import OUTPUT_FOLDER, RANDOM_SEED
 from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
-import os
 
 async def main():
 
@@ -35,7 +37,7 @@ async def main():
 
     next_step("Step 2. Scrape each URL.")
     async with async_playwright() as pw_instance:
-        scraper: ScrapeMunicodePage = await ScrapeMunicodePage.start(domain="https://municode.com/", pw_instance=pw_instance, headless=False)
+        scraper: ScrapeMunicodeLibraryPage = await ScrapeMunicodeLibraryPage.start(domain="https://municode.com/", pw_instance=pw_instance, headless=False)
         for row in urls_df.itertuples():
             logger.info(f"Processing URL: {row.url}")
 
@@ -55,7 +57,7 @@ async def main():
             df = await scraper.scrape_municode_toc_menu()
 
             next_step("Step 2.4 Randomly select a URL from the DataFrame to get to the final URL.")
-            url = scraper.randomly_select_final_url(df, seed=RANDOM_SEED)
+            url = randomly_select_value_from_pandas_dataframe_column('url', df, seed=RANDOM_SEED)
 
             next_step("Step 2.5 Download the HTML of the final URL to disk.")
             await scraper.download_html_to_disk(url)
