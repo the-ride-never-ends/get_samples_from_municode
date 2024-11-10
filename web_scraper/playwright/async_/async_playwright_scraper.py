@@ -83,7 +83,7 @@ class AsyncPlaywrightScrapper:
         self.pw_instance: AsyncPlaywrightContextManager = pw_instance
         self.domain: str = domain
         self.user_agent: str = user_agent
-        self.sanitized_filename = sanitize_filename(self.domain)
+        self.sanitized_filename = sanitize_filename(self.domain, allow_spaces=False)
         self.output_dir = os.path.join(OUTPUT_FOLDER, self.sanitized_filename)
 
         # Create the output directory if it doesn't exist.
@@ -330,7 +330,7 @@ class AsyncPlaywrightScrapper:
     @async_try_except(exception=[AsyncPlaywrightTimeoutError, AsyncPlaywrightError], raise_exception=True)
     async def click_on(self, selector: str, *args, **kwargs) -> Coroutine[Any, Any, None]:
         """
-        Click on a specified element.
+        Move a "mouse" cursor over and click on a specified element.
         """
         return await self.page.locator(selector, *args, **kwargs).click()
 

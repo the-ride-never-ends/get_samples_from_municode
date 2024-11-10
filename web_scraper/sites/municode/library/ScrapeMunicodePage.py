@@ -1,15 +1,11 @@
 import asyncio
-from collections import deque
 import random
-import re
-import time
 from typing import NamedTuple
 
-import pandas as pd
 
+import pandas as pd
 from playwright.async_api import (
     async_playwright,
-    ElementHandle,
     expect,
     Locator,
     Error as AsyncPlaywrightError,
@@ -18,14 +14,13 @@ from playwright.async_api import (
 
 
 from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScrapper
-
+from .walk_nested_municode_menu import WalkNestedMunicodeMenu
 
 from utils.shared.make_sha256_hash import make_sha256_hash
 from utils.shared.sanitize_filename import sanitize_filename
-from utils.shared.decorators.adjust_wait_time_for_execution import adjust_wait_time_for_execution
-# from utils.shared.load_from_csv import load_from_csv
+from utils.shared.make_path_from_function_name import make_path_from_function_name
 from utils.shared.save_to_csv import save_to_csv
-from utils.shared.decorators.try_except import try_except, async_try_except
+from utils.shared.decorators.try_except import async_try_except
 
 from config.config import *
 
@@ -33,17 +28,13 @@ from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
 
-output_folder = os.path.join(OUTPUT_FOLDER, "get_sidebar_urls_from_municode")
-if not os.path.exists(output_folder):
-    print(f"Creating output folder: {output_folder}")
-    os.mkdir(output_folder)
-
-
-
 class ScrapeMunicodePage(AsyncPlaywrightScrapper):
     """
     Scrape a Municode library page
     """
+
+    NODE_ID_SELECTOR  = 'a[href*="?nodeId="]' # NOTE This selector works.
+
     def __init__(self,
                 domain: str,
                 pw_instance,
@@ -51,89 +42,103 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
                 user_agent: str="*",
                 **kwargs):
         super().__init__(domain, pw_instance, *args, user_agent=user_agent, **kwargs)
-        self.xpath_dict = {
-            "current_version": '//*[@id="codebankToggle"]/button/text()',
-            "version_button": '//*[@id="codebankToggle"]/button/',
-            "version_text_paths": '//mcc-codebank//ul/li//button/text()',
-            'toc': "//input[starts-with(@id, 'genToc_')]" # NOTE toc = Table of Contents
-        }
-        self.queue = deque()
+
+        output_folder = os.path.join(OUTPUT_FOLDER, "ScrapeMunicodePage")
+        if not os.path.exists(output_folder):
+            print(f"Creating output folder: {output_folder}")
+            os.mkdir(output_folder)
+
         self.output_folder:str = output_folder
-        self.place_name:str = None
+        self.place_name:str = sanitize_filename(domain)
+        self.html_results_path: str =  os.path.join(self.output_folder, f'{self.place_name}_expanded_toc.html')
+
 
     async def screen_shot_frontpage(self, page):
         """
         Take a screenshot of the frontpage
         """
-
         await self.navigate_to(page, self.domain)
         await self.page.screenshot(path=os.path.join(self.output_folder, f"{self.place_name}_frontpage.png"))
+        return
 
-    async def count_top_level_menu_elements(self):
+
+    async def count_top_level_menu_elements(self, count_list: list[int]) -> None: # -> list[int]
         """
         Get the top-level node elements from the Table of Contents.
         """
+        logger.debug(f"Selecting top-level node elements with root_selector {self.NODE_ID_SELECTOR}...")
+        try:
+            # Select all the root anchors.
+            root_anchors = await self.page.query_selector_all(self.NODE_ID_SELECTOR)
+            logger.info(f"Found {len(root_anchors)} top-level node elements with root_selector {self.NODE_ID_SELECTOR}")
 
-    # async def randomly_select_top_level_menu_element(self, seed):
-    #     # Set the random seed for reproducibility
-    #     random.seed(seed)
-
-    #     # Wait for the top-level menu elements to be visible
-    #     top_level_toc_button_id = # 'li[depth="0"][id^="genToc_"] .toc-text' '[id^="genToc_"]'
-    #     # await self.page.get_by_role("button", name="Table of Contents").click()
-    #     await self.page.wait_for_selector(top_level_toc_button_id, state='visible')
-
-    #     # Get all elements with IDs starting with "genToc_"
-    #     anchor_elements = await self.page.query_selector_all(top_level_toc_button_id)
-    #     logger.debug(f"anchor_elements: {anchor_elements}")
-
-    #     if not anchor_elements:
-    #         raise Exception("No top-level menu elements found")
-
-    #     # Randomly select one of the top-level elements
-    #     selected_element = random.choice(anchor_elements)
-
-    #     # Get the text content of the selected element
-    #     element_text = await selected_element.text_content()
+            # Put them in the input_list
+            count_list.append(len(root_anchors))
+        except (AsyncPlaywrightError, AsyncPlaywrightTimeoutError) as e:
+            logger.error(f"Error selecting top-level node elements with root_selector {self.NODE_ID_SELECTOR}: {e}")
         
-    #     # Get the href attribute of the selected element
-    #     element_href = await selected_element.get_attribute('href')
-
-    #     # Click the selected element
-    #     await selected_element.click()
-
-    #     # Log the selection
-    #     logger.info(f"Randomly selected top-level menu element: '{selected_element}'\ntext: '{element_text}\nhref: '{element_href}'")
-
-    #     # Return the selected element for further use if needed
-    #     return selected_element, element_text, element_href
+        return count_list
 
 
-
-    # # Example ways to inspect a JSHandle
-    # async def inspect_handle(self, idx, handle):
-    #     # Get all properties
-    #     properties = await handle.evaluate('''node => ({
-    #         tagName: node.tagName,
-    #         id: node.id,
-    #         className: node.className,
-    #         textContent: node.textContent,
-    #         attributes: Array.from(node.attributes).map(attr => ({
-    #             name: attr.name,
-    #             value: attr.value
-    #         }))
-    #     })''')
-        
-    #     # Or get specific attributes
-    #     href = await handle.get_attribute('href')
-    #     text = await handle.text_content()
-        
-    #     logger.info(f"Element {idx}\nProperties: {properties}\nhref: {href}\ntext: {text}")
-
-
-    async def randomly_select_top_level_menu_element(self, seed):
+    def randomly_select_final_url(self, df: pd.DataFrame, seed: int) -> str:
         """
-        Randomly selects and clicks a top-level menu element from a Municode page.
+        Returns a random URL from a DataFrame based on an input seed.
+        """
+        random.seed(seed)
+        selected_index = random.randint(0, len(df) - 1)
+        selected_url = df.loc[selected_index, 'url']
+        return selected_url
+
+
+    async def download_html_to_disk(self, url: str) -> None:
+        """
+        Navigate to the given URL and download the HTML content to disk.
+        """
+        try:
+            await self.navigate_to(url)
+
+            # Get the HTML content
+            html_content = await self.page.content()
+            
+            # Create a filename based on the URL
+            filename = sanitize_filename(url) + '.html'
+            filepath = os.path.join(self.output_folder, filename)
+            
+            # Write the HTML content to disk
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+
+            logger.info(f"Successfully downloaded HTML from {url} to {filepath}.")
+        
+        except (AsyncPlaywrightError, AsyncPlaywrightTimeoutError) as e:
+            logger.error(f"Playwright error while downloading HTML from {url}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error while downloading HTML from {url}: {e}")
+        return
+
+
+    def _flatten_recursive(self, lst: list) -> list:
+        """
+        Recursively flatten a nested list structure.
+        
+        Args:
+            lst (list): The nested list to flatten.
+        
+        Returns:
+            list: A flattened version of the input list.
+        """
+        flattened = []
+        for item in lst:
+            if isinstance(item, list):
+                flattened.extend(self._flatten_recursive(item))
+            else:
+                flattened.append(item)
+        return flattened
+
+
+    async def scrape_municode_toc_menu(self):
+        """
+        Scrape a Table of Contents menu from Municode.
         
         Args:
             seed (int): Random seed for reproducibility
@@ -141,206 +146,36 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
         Returns:
             tuple: (selected_element, element_text, element_href)
         """
-        # Set the random seed for reproducibility
-        random.seed(seed)
 
         try:
             # Wait for the top-level menu elements to be visible
             # Modified selector to target the actual clickable elements more precisely
-            node_id_selector  = 'a[href*="?nodeId="]' # NOTE This selector works.
-            await self.page.wait_for_selector(node_id_selector , state='visible', timeout=10000)
+            await self.page.wait_for_selector(self.NODE_ID_SELECTOR , state='visible', timeout=10000)
 
             # Get all elements with the modified selector
-            anchor_elements  = await self.page.query_selector_all(node_id_selector)
-            logger.debug(f"Found {len(anchor_elements)} anchor elements")
-            logger.debug(f"anchor_elements: {anchor_elements}")
+            # Create walk instance
+            walk = WalkNestedMunicodeMenu(self.page, self.place_name, self.output_folder)
 
-            if not anchor_elements:
-                raise Exception("No anchor elements found")
+            # Walk the nested menu and save the results.
+            df: pd.DataFrame = await walk.nested_menu(self.NODE_ID_SELECTOR)
+            logger.info("Walk of Municode ToC menu finished.")
+            logger.debug(f"df\n{df.head()}",f=True)
 
+            # Save the HTML from the webpage once the nodes have been expanded.
+            logger.info("Nodes expanded successfully.\nGetting HTML...")
+            html = await self.page.inner_html('body')
+            html_filepath = make_path_from_function_name(f"{self.page.url}.html")
+            with open(html_filepath, 'w', encoding='utf-8') as file:
+                file.write(html)
+            logger.info(f"{os.path.basename(html_filepath)} successfully saved to output folder.")
+            return
 
-            # Filter these elements based on the genToc_ regex
-            filtered_elements = await self.page.evaluate('''
-                (anchors) => {
-                    const regex = new RegExp('^genToc_.*');  // Example regex for IDs
-                    return anchors.filter(anchor => {
-                        // Check if the parent element's ID matches the regex
-                        return regex.test(anchor.parentElement.id);
-                    }).map(anchor => ({
-                        href: anchor.href,
-                        text: anchor.textContent,
-                        parentId: anchor.parentElement.id
-                    }));
-                }
-            ''', anchor_elements)
-            logger.debug(f"filtered_elements len: {len(filtered_elements)}\nfiltered_elements: {filtered_elements}")
-
-
-            # Recursive clicking.
-            clicked_buttons = set()
-            growth = 0
-            for idx, element in enumerate(filtered_elements, start=1):
-                try:
-                    click_button_results = await self.page.evaluate('''
-                        async (anchors) => {
-                            const regex = new RegExp('^genToc_.*');  // Example regex for IDs
-                            const clickedButtons = [];
-                            
-                            for (const anchor of anchors) {
-                                if (regex.test(anchor.parentElement.id)) {
-                                    // Look for a button within the same parent element
-                                    const button = anchor.parentElement.querySelector('button');
-                                    if (button) {
-                                        await button.click();  // Click the button if found
-                                        clickedButtons.push({
-                                            href: anchor.href,
-                                            parentId: anchor.parentElement.id,
-                                            buttonText: button.textContent.trim()
-                                        });
-                                    }
-                                }
-                            }
-                            return clickedButtons;
-                        }
-                    ''', element)
-                    clicked_buttons.update(click_button_results)
-                    growth += len(clicked_buttons)
-                    logger.info(f"Sweep {idx} found {growth} buttons. Clicking again...")
-
-            except AsyncPlaywrightTimeoutError as e:
-                logger.error(f"Timeout error occurred for click_button_results: {e}")
-            # logger.debug(f"click_button_results len: {len(click_button_results)}\nclick_button_results: {click_button_results}", t=30)
-
-            # Read JavaScript from a file
-            js_filepath = os.path.join(os.path.dirname(__file__), 'expandAndGather.js')
-            with open(js_filepath, 'r') as file:
-                expand_and_gather_js = file.read()
-            
-            # Recursively click all the nodes.
-            expand_and_gather_results = await self.page.evaluate(expand_and_gather_js, anchor_elements)
-            logger.debug(f"expand_and_gather_results len: {len(expand_and_gather_results)}\expand_and_gather_results: {expand_and_gather_results}", t=30)
-            # Once all the icons are clicked, we can just get all the HTML from the page.
-            # This should also return how many nodes we clicked
-            results = await self.page.inner_html('body')
-
-
-
-            # for idx, anchor in enumerate(anchor_elements, start=1):
-            #     # Debug: Inspect the first anchor
-            #     # element_details = await anchor.evaluate('''anchor => ({
-            #     #     tagName: anchor.tagName,
-            #     #     href: anchor.href,
-            #     #     text: anchor.textContent,
-            #     #     className: anchor.className,
-            #     #     hasParentLi: !!anchor.closest('li[depth="0"]'),
-            #     #     hasButton: !!anchor.closest('li[depth="0"]')?.querySelector('button[role="button"]')
-            #     # })''')
-            #     element_details = await self.page.evaluate('''
-            #         anchor => {
-            #             // Initialize details object for the anchor
-            #             const details = {
-            #                 tagName: anchor.tagName,
-            #                 href: anchor.href,
-            #                 text: anchor.textContent.trim(),
-            #                 className: anchor.className,
-            #                 hasParentLi: !!anchor.closest('li[depth="0"]'),
-            #                 hasButton: false
-            #             };
-            #             const regex = new RegExp('^genToc_.*');
-            #             const matchingElements = [];
-            #                 .forEach(element => {
-            #                 if (regex.test(element.id)) {
-            #                     const buttons = element.querySelectorAll('button');
-            #                     buttons.forEach(button => matchingElements.push(button));
-            #                 }
-            #             });
-                                                           
-
-            #             const li = !!anchor.closest('li[depth="0"]');
-            #             if (li) {
-            #                 console.log('Found element in li')
-            #                 console.log(details)
-            #                 details.hasParentLi = true;
-            #                 // Look for button within the li
-            #                 const button = li.querySelector('.toc-button-expand, button.toggle-node-button');
-            #                 if (button) {
-            #                     details.hasButton = true;
-            #                     details.buttonClass = button.className;
-            #                     details.buttonRole = button.getAttribute('role');
-            #                 }
-            #             }
-                        
-            #             return details;
-            #         }
-            #     ''', anchor)
-            #     logger.debug(f"{idx} anchor details: {element_details}")
-                #await self.inspect_handle(idx, anchor)
-
-            #genToc_TIT1GEPR > button
-            #     # Get the containing list item (parent or ancestor with depth="0")
-            #     parent_li: bool = await anchor.evaluate('''
-            #         anchor => { 
-            #             anchor.closest('li[depth="0"]')
-            #             return li ? true : false;
-            #         }
-            #     ''')
-            #     logger.info(f"selected_li: {parent_li}")
-
-            #     if not parent_li:
-            #         logger.debug(f"Skipping anchor {idx} as it's not a top-level menu item")
-            #         continue
-            #     else:
-            #         # Find the button within the same list item
-            #         button_exists = await anchor.evaluate('''
-            #             anchor => {
-            #                 const li = anchor.closest('li[depth="0"]');
-            #                 const button = li.querySelector('button[role="button"]');
-            #                 return button ? true : false;
-            #             }
-            #         ''')
-
-            #         if button_exists:
-            #             valid_elements.append(anchor)
-            #             logger.error(f"Found button for anchor {idx}")
-            #             continue
-        
-            # logger.info(f"Found {len(valid_elements)} anchor elements in li with a button")
-            # output_list = []
-            # for element in valid_elements:
-            #     element: ElementHandle
-            #     logger.info(f"Valid element: {element}")
-
-            #     # Make sure the element is in view before clicking
-            #     await element.scroll_into_view_if_needed()
-                
-            #     # Add a small delay to ensure the element is properly rendered
-            #     await self.page.wait_for_timeout(500)
-
-            #     # Click the element and wait for navigation if needed
-            #     try:
-            #         await element.click()
-            #         # Optionally wait for any navigation or content update
-            #         await self.page.wait_for_load_state('networkidle', timeout=5000)
-            #     except Exception as e:
-            #         logger.warning(f"Click failed, attempting JavaScript click: {str(e)}")
-            #         await self.page.evaluate('element => element.click()', element)
-            #         element_text = await element.text_content()
-            #         element_href = await element.get_attribute('href')
-
-            #     logger.info(
-            #         f"Successfully selected top-level menu element:\n"
-            #         f"Text: '{element_text}'\n"
-            #         f"Href: '{element_href}'"
-            #     )
-            #     output_list.append((element, element_text, element_href))
-            # return output_list 
-
-        except Exception as e:
-            logger.error(f"Error in randomly_select_top_level_menu_element: {str(e)}")
+        except (AsyncPlaywrightTimeoutError, AsyncPlaywrightError) as e:
+            logger.error(f"Playwright Error in scrape_municode_toc_menu: {e}")
             raise
-
-
-
+        except Exception as e:
+            logger.error(f"Error in scrape_municode_toc_menu: {e}")
+            raise
 
 
 class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
@@ -358,14 +193,8 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
                 user_agent: str="*",
                 **kwargs):
         super().__init__(domain, pw_instance, *args, user_agent=user_agent, **kwargs)
-        self.xpath_dict = {
-            "current_version": '//*[@id="codebankToggle"]/button/text()',
-            "version_button": '//*[@id="codebankToggle"]/button/',
-            "version_text_paths": '//mcc-codebank//ul/li//button/text()',
-            'toc': "//input[starts-with(@id, 'genToc_')]" # NOTE toc = Table of Contents
-        }
-        self.queue = deque()
-        self.output_folder:str = output_folder
+
+        self.output_folder:str = None
         self.place_name:str = None
 
     def test(self):
@@ -379,11 +208,6 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         toc_button_locator: Locator = await self.page.get_by_text("Browse table of contents")
         expect(toc_button_locator).to_be_visible()
 
-        #         <div class="col-sm-6 hidden-md hidden-lg hidden-xl" style="margin-top: 8px;">
-        #     <button type="button" class="btn btn-raised btn-primary" ng-click="$root.zoneMgrSvc.toggleVisibleZone()">
-        #         <i class="fa fa-list-ul"></i> Browse table of contents
-        #     </button>
-        # </div>
 
     async def _choose_browse_when_given_choice(self):
         """
@@ -482,15 +306,12 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         # NOTE Brute force time baby!
         codebank_button = '#codebankToggle button[data-original-title="CodeBank"]'
 
-        # '#codebankToggle button[data-intro="Switch between old and current versions."]' # f'button:has({codebank_label}):has(i.fa fa-caret-down)'
-
         logger.info("Waiting for the codebank button to be visible...")
         await self.page.wait_for_selector(codebank_button, state='visible')
 
-        logger.info("Codebank button is visible. Getting current version from it...") # CSS selector ftw???
-        current_version = await self.page.locator(codebank_button).text_content() #codebank > ul > li:nth-child(1) > div.timeline-entry > div > div
+        logger.info("Codebank button is visible. Getting current version from it...")
+        current_version = await self.page.locator(codebank_button).text_content()
         logger.debug(f"current_version: {current_version}")
-
 
         # Hover over and click the codebank to open the popup menu
         logger.info(f"Got current code version '{current_version}'. Hovering over and clicking Codebank button...")
@@ -501,9 +322,10 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         logger.info("Codebank button was hovered over and clicked successfully. Waiting for popup menu...")
         popup_selector = 'List of previous versions of code'
 
-        # 'aria-label.List of previous versions of code' # NOTE'.popup-menu' is a CSS selector! Also, since the aria-label is hidden, you need to use state='hidden' in order to get it.
+        # 'aria-label.List of previous versions of code' 
+        # NOTE Since the aria-label is hidden, you need to use state='hidden' in order to get it.
         await self.page.wait_for_selector(popup_selector, state='hidden')
-        #codebank > ul > li:nth-child(1) > div.timeline-entry > div > div > button
+
         # Go into the CodeBank list and get the button texts.
         # These should be all the past version dates.
         logger.info("Popup menu is visible. Getting previous code versions...")
@@ -528,30 +350,7 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         return 
 
 
-    # def _skip_if_we_have_url_already(self, url: str) -> list[dict]|None:
-    #     """
-    #     Check if we already have a CSV file of the input URL. 
-    #     If we do, load it as a list of dictionaries and return it. Else, return None
-    #     """
-    #     url_file_path = os.path.join(OUTPUT_FOLDER, f"{sanitize_filename(url)}.csv")
-    #     if os.path.exists(url_file_path):
-    #         logger.info(f"Got URL '{url}' already. Loading csv...")
-    #         output_dict = load_from_csv(url_file_path)
-    #         return output_dict
-    #     else:
-    #         return None
-
-
-    async def get_page_version(self) -> bool:
-        return self.is_regular_municode_page()
-
-    # Decorator to wait per Municode's robots.txt
-    # NOTE Since code URLs are processed successively, we can subtract off the time it took to get all the pages elements
-    # from the wait time specified in robots.txt. This should speed things up (?).
-
-    #@async_adjust_wait_time_for_execution(wait_in_seconds=LEGAL_WEBSITE_DICT["municode"]["wait_in_seconds"])
-
-    @try_except(exception=[AsyncPlaywrightError])
+    @async_try_except(exception=[AsyncPlaywrightError])
     async def get_municode_sidebar_elements(self, 
                                       i: int,
                                       row: NamedTuple,
@@ -679,198 +478,6 @@ class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
         return 
 
 
-
-
-
-
-        # try: # NOTE get_by commands return a LOCATOR and thus are NOT Coroutines that need to be awaited.
-
-        #     num = await self.page.locator(codebank_button).count()
-        #     logger.info(f"Found {num} 'Close' buttons")
-
-        #     # button: Locator = self.page.get_by_label("Table of Contents").get_by_role("button").and_(self.page.get_by_text("Close"))
-        #     button: Locator = await self.page.locator(codebank_button)
-
-        #     await self.save_page_html_content_to_output_dir(f"{self.place_name}_{prefix}.html")
-
-        #     #self.page.get_by_test_id("toc").get_by_role("button", name="Close", include_hidden=True) #self.page.wait_for_selector(codebank_button, state="visible", timeout=5000)
-
-        #     logger.info("version menu 'X' button found")
-        # except Exception as e:
-        #     logger.exception(f"version menu 'X' button not found: {e}")
-        #     raise
-
-        # # # Hover over and click the X to open the popup menu
-        # # logger.debug(f"Hovering over and pressing version menu 'X' button to close the version menu...")
-        # # await element.hover()
-        # # #await self.move_mouse_cursor_to_hover_over(codebank_button)
-        # logger.debug(f"Hover over version menu 'X' button successful...\nClicking...")
-        # await asyncio.sleep(1)
-        # await button.click()
-
-        # # logger.debug("Clicking with force=True")
-        # # await asyncio.sleep(1)
-        # # await button.click(force=True),
-
-        # await self.save_page_html_content_to_output_dir(f"{self.place_name}_{prefix}_after_click.html")
-
-        # # JavaScript click
-        # logger.debug("Clicking with JS")
-        # await asyncio.sleep(1)
-        # await button.evaluate('element => element.click()'),
-        
-
-        # # Dispatch click event
-        # logger.debug("Clicking with dispatch event click")
-        # await asyncio.sleep(1)
-        # await button.dispatch_event('click'),
-
-        # # Double click
-        # logger.debug("Double Clicking")
-        # await asyncio.sleep(1)
-        # await button.dblclick(),
-
-        # # Click with delay
-        # logger.debug("Clicking with delay")
-        # await asyncio.sleep(1)
-        # await button.click(delay=100),
-
-        # # if await self.page.get_by_role("button").and_(self.page.get_by_text("Close")).count() > 0:
-        # #     logger.error(f"version menu 'X' button still visible after clicking. Clicking again...")
-        # #     await self.page.get_by_role("button").and_(self.page.get_by_text("Close")).click()
-
-        # logger.debug(f"Version menu 'X' button clicked successfully.\nReturning...")
-
-        # return
-
-
-    # async def debug_button_click(self, button: Locator):
-
-    #     # 1. Basic element checks
-    #     logger.info("=== BASIC ELEMENT CHECKS ===")
-    #     count = await button.count()
-    #     logger.info(f"Elements found: {count}")
-        
-    #     if count == 0:
-    #         logger.error("Button not found in DOM!")
-    #         return
-            
-    #     # 2. Visibility checks
-    #     logger.info("\n=== VISIBILITY CHECKS ===")
-    #     is_visible = await button.is_visible()
-    #     is_hidden = await button.is_hidden()
-    #     logger.info(f"Is visible: {is_visible}")
-    #     logger.info(f"Is hidden: {is_hidden}")
-        
-    #     # 3. Element properties
-    #     logger.info("\n=== ELEMENT PROPERTIES ===")
-    #     properties = await self.page.evaluate('''element => {
-    #         const computedStyle = window.getComputedStyle(element);
-    #         return {
-    #             display: computedStyle.display,
-    #             visibility: computedStyle.visibility,
-    #             opacity: computedStyle.opacity,
-    #             position: computedStyle.position,
-    #             zIndex: computedStyle.zIndex,
-    #             pointerEvents: computedStyle.pointerEvents,
-    #             disabled: element.disabled,
-    #             offsetWidth: element.offsetWidth,
-    #             offsetHeight: element.offsetHeight,
-    #             getBoundingClientRect: element.getBoundingClientRect()
-    #         }
-    #     }''')
-    #     logger.info(f"Element properties: {properties}")
-        
-    #     # 4. Check event listeners
-    #     logger.info("\n=== EVENT LISTENERS ===")
-    #     has_listeners = await button.evaluate('''element => {
-    #         const listeners = window.getEventListeners ? window.getEventListeners(element) : {};
-    #         return {
-    #             hasClickListener: 'click' in listeners,
-    #             totalListeners: Object.keys(listeners).length,
-    #             listenerTypes: Object.keys(listeners)
-    #         }
-    #     }''')
-    #     logger.info(f"Event listeners: {has_listeners}")
-        
-    #     # 5. Set up console monitoring
-    #     logger.info("\n=== ATTEMPTING CLICKS ===")
-    #     self.page.on('console', lambda msg: logger.debug(f'Console: {msg.text}'))
-    #     self.page.on('pageerror', lambda err: logger.error(f'Page error: {err.text}'))
-        
-    #     # 6. Try different click methods
-
-    #     click_attempts = [
-    #         # Force click
-    #         await button.click(force=True),
-
-    #         # JavaScript click
-    #         await button.evaluate('element => element.click()'),
-            
-    #         # Dispatch click event
-    #         await button.dispatch_event('click'),
-
-    #         # Double click
-    #         await button.dblclick(),
-
-    #         # Click with delay
-    #         await button.click(delay=100),
-
-    #     ]
-
-    #     # Try each click method
-    #     for i, click_attempt in enumerate(click_attempts, 1):
-    #         try:
-    #             logger.info(f"\nTrying click method {i}...")
-    #             await click_attempt()
-    #             logger.info(f"Click method {i} completed without errors")
-
-    #             # Check if element still exists after click
-    #             post_click_count = await button.count()
-    #             logger.info(f"Element still exists after click: {post_click_count > 0}")
-
-    #             # Brief pause to observe any changes
-    #             await asyncio.sleep(0.5)
-                
-    #         except Exception as e:
-    #             logger.error(f"Click method {i} failed: {str(e)}")
-        
-    #     # 7. Check for overlapping elements
-    #     logger.info("\n=== CHECKING FOR OVERLAPPING ELEMENTS ===")
-    #     overlapping = None #or await self.page.evaluate('''() => {
-    #     #     const element = document.querySelector('#toc button[aria-label="Close"]');
-    #     #     if (!element) return [];
-            
-    #     #     const rect = element.getBoundingClientRect();
-    #     #     const elements = document.elementsFromPoint(
-    #     #         rect.left + rect.width/2,
-    #     #         rect.top + rect.height/2
-    #     #     );
-    #     #     return elements.map(el => ({
-    #     #         tag: el.tagName,
-    #     #         id: el.id,
-    #     #         class: el.className,
-    #     #         zIndex: window.getComputedStyle(el).zIndex
-    #     #     }));
-    #     # }''')
-    #     logger.info(f"Elements at click position: {overlapping}")
-        
-    #     # 8. Final element state
-    #     logger.info("\n=== FINAL ELEMENT STATE ===")
-    #     final_count = await button.count()
-    #     final_visible = await button.is_visible() if final_count > 0 else False
-    #     logger.info(f"Element still exists: {final_count > 0}")
-    #     logger.info(f"Element still visible: {final_visible}")
-        
-    #     return {
-    #         "found": count > 0,
-    #         "visible": is_visible,
-    #         "properties": properties,
-    #         "has_listeners": has_listeners,
-    #         "overlapping_elements": overlapping
-    #     }
-
-
 async def get_sidebar_urls_from_municode_with_playwright(sources_df: pd.DataFrame) -> pd.DataFrame:
     """
     Get href and text of sidebar elements in a Municode city code URL.
@@ -915,15 +522,13 @@ async def get_sidebar_urls_from_municode_with_playwright(sources_df: pd.DataFram
 
         await municode.exit()
 
-
     logger.info("get_municode_sidebar_elements loop complete. Flattening...")
     # Flatten the list of lists of dictionaries into just a list of dictionaries.
     output_list = [item for sublist in list_of_lists_of_dicts for item in sublist]
     
-    logger.info("get_sidebar_urls_from_municode_with_selenium function complete. Making dataframes and saving...")
+    logger.info("get_sidebar_urls_from_municode_with_selenium function complete. Making DataFrames and saving...")
     save_code_versions_to_csv(output_list) # We save first to prevent pandas fuck-upery.
     urls_df = make_urls_df(output_list)
-
 
     return urls_df
 
@@ -953,7 +558,7 @@ def make_urls_df(output_list: list[dict]) -> pd.DataFrame:
         >>> 792b4192    not_found_from_query    254139  https://ecode360.com/LO1625/document/430360980.pdf
         >>> 792b4192    not_found_from_query    254139  https://ecode360.com/LO1625/document/430360980.pdf
     """
-    # Turn the list of dicts into a dataframe.
+    # Turn the list of dicts into a DataFrame.
     urls_df = pd.DataFrame.from_records(output_list)
 
     # Make url hashes for each url
@@ -971,7 +576,7 @@ def make_urls_df(output_list: list[dict]) -> pd.DataFrame:
     return urls_df
 
 
-from utils.shared.save_to_csv import save_to_csv
+
 def save_code_versions_to_csv(output_list: list[dict]) -> None:
     """
     Example Input:
@@ -985,65 +590,17 @@ def save_code_versions_to_csv(output_list: list[dict]) -> None:
     >>> },...]
     """
 
-    # Turn the list of dicts into a dataframe.
+    # Turn the list of dicts into a DataFrame.
     code_versions_df = pd.DataFrame.from_records(output_list)
 
     # Drop the urls columns.
     code_versions_df.drop(['url_hash','table_of_contents_urls'], axis=1, inplace=True)
 
-    # Save the dataframe to the output folder.
-    output_file = os.path.join(output_folder, sanitize_filename(output_list[0]['input_url']))
+    # Save the DataFrame to the output folder.
+    output_file = make_path_from_function_name(
+                    sanitize_filename(output_list[0]['input_url'])
+                )
     save_to_csv(code_versions_df, output_file)
 
     return
 
-
-
-    # def _get_current_code_version(self, selector: str) -> str:
-    #     """
-    #     Get the date for the current version of the municipal code.
-    #     """
-
-    #     # Wait for the button to be visible
-    #     button_selector = 'button:has(span.text-xs.text-muted):has(i.fa.fa-caret-down)'
-    #     self.page.wait_for_selector(button_selector)
-
-    #     # Initialize HTML targets and JavaScript command.
-    #     version_date_id = 'span.text-sm.text-muted'
-    #     args = {"version_date_id": version_date_id}
-    #     js = '() => document.querySelector("{version_date_id}").textContent'
-
-    #     # Wait for the element to be visible
-    #     self.page.wait_for_selector(version_date_id)
-
-    #     # Get the code with JavaScript
-    #     version_date: str = self.evaluate_js(js, js_kwargs=args)
-
-    #     logger.debug(f'version_date: {version_date}')
-    #     return version_date.strip()
-
-
-    # async def _get_all_code_versions(self, url: str) -> list[str]:
-    #     """
-    #     Get the dates for current and past versions of the municipal code.
-    #     NOTE: You need to click on each individual button to get the link itself.
-    #     """
-    #     version_date_button_selector = 'span.text-sm.text-muted'
-
-    #     version_date = self._get_current_code_version()
-
-
-    #     # Press the button that shows the code archives pop-up
-    #     version_button = None
-    #     await self.click_on(version_button)
-    #     self.press_buttons(url, xpath=self.xpath_dict['version_button'])
-
-    #     # Get all the dates in the pop-up.
-    #     buttons = self.wait_for_and_then_return_elements(
-    #         self.xpath_dict['version_text_paths'], wait_time=10, poll_frequency=0.5
-    #     )
-    #     version_list = [
-    #         button.text.strip() for button in buttons
-    #     ]
-    #     logger.debug(f'version_list\n{version_list}',f=True)
-    #     return version_list
