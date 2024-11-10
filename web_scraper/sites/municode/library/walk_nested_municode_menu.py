@@ -8,7 +8,7 @@ import re
 
 import pandas as pd
 
-
+from utils.shared.sanitize_filename import sanitize_filename
 from utils.shared.save_dataclass_to_csv_via_pandas import save_dataclass_to_csv_via_pandas
 from logger.logger import Logger
 logger = Logger(logger_name=__name__)
@@ -125,7 +125,7 @@ class WalkNestedMunicodeMenu:
             await self._log_traversal_summary()
 
             # Save the results to a CSV file via pandas.
-            df = save_dataclass_to_csv_via_pandas(results, filename=f"{self.place_name}_menu_traversal_results.csv")
+            df = save_dataclass_to_csv_via_pandas(results, filename=f"{sanitize_filename(self.page.url)}_menu_traversal_results.csv", return_df=True)
             return df
 
         except Exception as e:

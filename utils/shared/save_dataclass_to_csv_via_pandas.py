@@ -25,19 +25,27 @@ def _convert_dataclass_to_dict(obj: Any) -> dict:
     result = {}
     try:
         for field in fields(obj):
-            _value = getattr(obj, field.name)
-            
+            value = _value = getattr(obj, field.name)
+            converted = False
+
             # Recursively convert nested dataclasses
             if is_dataclass(_value):
-                value = _convert_dataclass_to_dict(_value)
+                conv_value = _convert_dataclass_to_dict(_value)
+                converted = True
             # Handle lists of dataclasses
             elif isinstance(_value, list):
-                value = [_convert_dataclass_to_dict(item) if is_dataclass(item) else item  for item in _value]
+                conv_value = [_convert_dataclass_to_dict(item) if is_dataclass(item) else item for item in _value]
+                converted = True
             # Handle dictionaries that might contain dataclasses
             elif isinstance(_value, dict):
-                value = {k: _convert_dataclass_to_dict(v) if is_dataclass(v) else v for k, v in _value.items() }
+                conv_value = {k: _convert_dataclass_to_dict(v) if is_dataclass(v) else v for k, v in _value.items() }
+                converted = True
+
+            elif isinstance(_value, set):
+                conv_value = [_convert_dataclass_to_dict(item) if is_dataclass(item) else item for item in _value]
+                converted = True
             
-            result[field.name] = value
+            result[field.name] = value if not converted else conv_value
     except Exception as e:
         print(f"Error converting dataclass to dict: {e}")
         raise e
@@ -131,7 +139,7 @@ def save_dataclass_to_csv_via_pandas(dataclass: Any|list[Any]|dict[str, Any],
     dataclass = dataclass[0] if isinstance(dataclass, list) else dataclass
     headers: list[str] = _get_csv_headers_from_dataclass_keys(dataclass)
 
-    df = pd.DataFrame().from_records(rows, columns=headers)
+    df = pd.DataFrame.from_records(rows, columns=headers)
 
     print(f"Saving DataFrame CSV to '{filepath}'...")
     df.to_csv(filepath, index=index, encoding=encoding)

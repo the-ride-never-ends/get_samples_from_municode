@@ -50,7 +50,6 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
 
         self.output_folder:str = output_folder
         self.place_name:str = sanitize_filename(domain)
-        self.html_results_path: str =  os.path.join(self.output_folder, f'{self.place_name}_expanded_toc.html')
 
 
     async def screen_shot_frontpage(self, page):
@@ -109,6 +108,7 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
                 f.write(html_content)
 
             logger.info(f"Successfully downloaded HTML from {url} to {filepath}.")
+            await self.close_current_page_and_context()
         
         except (AsyncPlaywrightError, AsyncPlaywrightTimeoutError) as e:
             logger.error(f"Playwright error while downloading HTML from {url}: {e}")
@@ -117,26 +117,7 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
         return
 
 
-    def _flatten_recursive(self, lst: list) -> list:
-        """
-        Recursively flatten a nested list structure.
-        
-        Args:
-            lst (list): The nested list to flatten.
-        
-        Returns:
-            list: A flattened version of the input list.
-        """
-        flattened = []
-        for item in lst:
-            if isinstance(item, list):
-                flattened.extend(self._flatten_recursive(item))
-            else:
-                flattened.append(item)
-        return flattened
-
-
-    async def scrape_municode_toc_menu(self):
+    async def scrape_municode_toc_menu(self) -> pd.DataFrame:
         """
         Scrape a Table of Contents menu from Municode.
         
@@ -164,11 +145,13 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
             # Save the HTML from the webpage once the nodes have been expanded.
             logger.info("Nodes expanded successfully.\nGetting HTML...")
             html = await self.page.inner_html('body')
-            html_filepath = make_path_from_function_name(f"{self.page.url}.html")
+            html_filepath = make_path_from_function_name(f"{sanitize_filename(self.page.url)}.html")
             with open(html_filepath, 'w', encoding='utf-8') as file:
                 file.write(html)
+
             logger.info(f"{os.path.basename(html_filepath)} successfully saved to output folder.")
-            return
+            await self.close_current_page_and_context()
+            return df
 
         except (AsyncPlaywrightTimeoutError, AsyncPlaywrightError) as e:
             logger.error(f"Playwright Error in scrape_municode_toc_menu: {e}")

@@ -20,8 +20,4 @@ def make_path_from_function_name(filename: str="output.txt") -> str:
         print(f"Creating output folder: {output_folder}")
         os.mkdir(output_folder)
 
-    # Construct the filename from the function's name and filename.
-    filename = filename or sanitize_filename(calling_function_name)
-    filename += f"_{filename}" if filename else ""
-
     return os.path.join(output_folder, filename)

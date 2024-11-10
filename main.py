@@ -10,6 +10,7 @@ from playwright.async_api import async_playwright
 
 from utils.shared.next_step import next_step
 from utils.shared.load_from_csv_via_pandas import load_from_csv_via_pandas
+from utils.shared.sanitize_filename import sanitize_filename
 from utils.shared.get_total_size_of_files_with_specified_type_in_gigabytes import (
     get_total_size_of_files_with_specified_type_in_gigabytes
 )
@@ -20,6 +21,7 @@ from config.config import OUTPUT_FOLDER, RANDOM_SEED
 from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
+import os
 
 async def main():
 
@@ -36,6 +38,12 @@ async def main():
         scraper: ScrapeMunicodePage = await ScrapeMunicodePage.start(domain="https://municode.com/", pw_instance=pw_instance, headless=False)
         for row in urls_df.itertuples():
             logger.info(f"Processing URL: {row.url}")
+
+            filename = f"{sanitize_filename(row.url)}_menu_traversal_results.csv"
+            filepath = os.path.join(OUTPUT_FOLDER, filename)
+            if os.path.exists(filepath):
+                logger.info(f"Skipping URL: {row.url} because the file already exists: {filepath}")
+                continue
 
             next_step("Step 2.1 Go to each URL.")
             await scraper.navigate_to(url=row.url)
