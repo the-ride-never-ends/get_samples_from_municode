@@ -15,7 +15,7 @@ from utils.shared.get_total_size_of_files_with_specified_type_in_gigabytes impor
     get_total_size_of_files_with_specified_type_in_gigabytes
 )
 
-from web_scraper.sites.municode.library.ScrapeMunicodePage import ScrapeMunicodePage
+from web_scraper.sites.municode.library.scrape_municode_page import ScrapeMunicodePage
 
 from config.config import OUTPUT_FOLDER, RANDOM_SEED
 from logger.logger import Logger

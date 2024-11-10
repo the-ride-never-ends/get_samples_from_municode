@@ -43,7 +43,7 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
                 **kwargs):
         super().__init__(domain, pw_instance, *args, user_agent=user_agent, **kwargs)
 
-        output_folder = os.path.join(OUTPUT_FOLDER, "ScrapeMunicodePage")
+        output_folder = os.path.join(OUTPUT_FOLDER, "scrape_municode_page")
         if not os.path.exists(output_folder):
             print(f"Creating output folder: {output_folder}")
             os.mkdir(output_folder)
@@ -81,7 +81,7 @@ class ScrapeMunicodePage(AsyncPlaywrightScrapper):
 
     def randomly_select_final_url(self, df: pd.DataFrame, seed: int) -> str:
         """
-        Returns a random URL from a DataFrame based on an input seed.
+        Returns a random URL from a pandas DataFrame based on an input seed.
         """
         random.seed(seed)
         selected_index = random.randint(0, len(df) - 1)

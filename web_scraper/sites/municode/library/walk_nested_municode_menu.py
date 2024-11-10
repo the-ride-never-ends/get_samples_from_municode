@@ -310,7 +310,7 @@ class WalkNestedMunicodeMenu:
             try:
                 # Click the button
                 await button.click()
-                
+
                 # Wait for expansion
 
                 if await self._verify_expansion(node):
@@ -410,7 +410,8 @@ class WalkNestedMunicodeMenu:
 
     async def _make_node_id(self, node: ElementHandle) -> str:
         """
-        Get a unique identifier for a node.
+        Get a unique identifier for a node. 
+        NOTE If 2 nodes have the same text, they will have the same id.
         """
         try:
             node_id = await node.evaluate('node => node.parentElement.id')
@@ -421,7 +422,8 @@ class WalkNestedMunicodeMenu:
 
     async def _get_node_url(self, node: ElementHandle) -> str:
         """
-        Get a unique identifier for a node
+        Get a node's URL. 
+        If the node is a link, return the href attribute. Otherwise, return an empty string.
         """
         try:
             url = await node.as_element().get_attribute('href')
