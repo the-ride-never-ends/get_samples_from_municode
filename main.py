@@ -2,7 +2,7 @@
 import asyncio
 import os
 import sys
-
+from typing import NamedTuple
 
 import pandas as pd
 from playwright.async_api import async_playwright
@@ -25,9 +25,42 @@ from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
 
+from manual.unnest_csv import unnest_csv
+from utils.read_csv import read_csv
+UNNEST_CSV_ROUTE = True
+
+
+def unnest_csv_step(df: pd.DataFrame=None, row: NamedTuple=None) -> None|pd.DataFrame:
+    if df is None:
+        if UNNEST_CSV_ROUTE:
+            logger.info("Performing unnesting of specified CSV files in output folder...")
+            for file in os.listdir(OUTPUT_FOLDER):
+                logger.debug(f"file: {file}")
+                base_name = os.path.basename(file)
+                if file.endswith("traversal_results.csv"):
+                    unnested_csv_path = os.path.join(OUTPUT_FOLDER, base_name.replace(".csv", "_unnested.csv"))
+                    try:
+                        unnest_csv(os.path.join(OUTPUT_FOLDER, file), unnested_csv_path)
+                    except Exception as e:
+                        logger.error(f"Error unnesting {file}: {e}")
+                        raise e
+            logger.debug("Finished unnesting CSV files. Exiting...")
+            sys.exit(0)
+    else:
+        if row is None:
+            raise ValueError("row cannot be None if df is not None")
+        else:
+            
+            logger.info("Performing unnesting of input dataframe...")
+            base_name = sanitize_filename(row.url) + "_menu_traversal_results_unnested.csv"
+            unnested_csv_path = os.path.join(OUTPUT_FOLDER, base_name)
+            return unnest_csv(df, unnested_csv_path)
+
 async def main():
 
     logger.info("Begin __main__")
+
+    unnest_csv_step()
 
     next_step("Step 1. Get URLs from the CSV.")
     name = ["gnis, place_name, url"]
@@ -42,9 +75,9 @@ async def main():
             logger.info(f"Processing URL: {row.url}")
 
             filename = f"{sanitize_filename(row.url)}_menu_traversal_results.csv"
-            filepath = os.path.join(OUTPUT_FOLDER, filename)
-            if os.path.exists(filepath):
-                logger.info(f"Skipping URL: {row.url} because the file already exists: {filepath}")
+            file_path = os.path.join(OUTPUT_FOLDER, filename)
+            if os.path.exists(file_path):
+                logger.info(f"Skipping URL: {row.url} because the file already exists: {file_path}")
                 continue
 
             next_step("Step 2.1 Go to each URL.")
@@ -56,10 +89,13 @@ async def main():
             next_step("Step 2.3 Scrape Municode's Table of Contents nested menu, save it to CSV, and return a pandas DataFrame.")
             df = await scraper.scrape_municode_toc_menu()
 
-            next_step("Step 2.4 Randomly select a URL from the DataFrame to get to the final URL.")
+            next_step("Step 2.4 Flatten the nested dataframe.")
+            df = unnest_csv_step(df, row)
+
+            next_step("Step 2.5 Randomly select a URL from the DataFrame to get to the final URL.")
             url = randomly_select_value_from_pandas_dataframe_column('url', df, seed=RANDOM_SEED)
 
-            next_step("Step 2.5 Download the HTML of the final URL to disk.")
+            next_step("Step 2.6 Download the HTML of the final URL to disk.")
             await scraper.download_html_to_disk(url)
 
         await scraper.exit()

@@ -4,6 +4,7 @@ from typing import Optional, Any
 from playwright.async_api import Page, ElementHandle
 from datetime import datetime
 import re
+from typing import NamedTuple
 
 
 import pandas as pd
@@ -97,7 +98,7 @@ class WalkMunicodeToc:
         self.state = TraversalState()
 
 
-    async def nested_menu(self, root_selector: str) -> pd.DataFrame:
+    async def nested_menu(self, root_selector: str, row: NamedTuple) -> pd.DataFrame:
         """
         Walk nested menu structures using Playwright.
         Starts at the root node and recursively traverses the menu until all nodes are visited or the maximum depth is reached.
@@ -106,6 +107,7 @@ class WalkMunicodeToc:
 
         Args:
             root_selector: CSS selector for root menu elements
+            row (NamedTuple): A row from the dataframe containing the URL and place name.
             
         Returns:
             pd.DataFrame of objects from the NodeData dataclass, where each object is a column and each row is a node.
@@ -125,7 +127,10 @@ class WalkMunicodeToc:
             await self._log_traversal_summary()
 
             # Save the results to a CSV file via pandas.
-            df = save_dataclass_to_csv_via_pandas(results, filename=f"{sanitize_filename(self.page.url)}_menu_traversal_results.csv", return_df=True)
+            place_name: str = row.place_name
+            place_name = place_name.replace(" ", "_").lower()
+            filename = f"{place_name}_{row.gnis}_menu_traversal_results.csv"
+            df = save_dataclass_to_csv_via_pandas(results, filename=filename, return_df=True)
             return df
 
         except Exception as e:

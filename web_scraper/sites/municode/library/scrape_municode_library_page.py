@@ -111,12 +111,13 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
         return
 
 
-    async def scrape_municode_toc_menu(self) -> pd.DataFrame:
+    async def scrape_municode_toc_menu(self, row: NamedTuple) -> pd.DataFrame:
         """
         Scrape a Table of Contents menu from Municode.
         
         Args:
-            seed (int): Random seed for reproducibility
+            seed (int): Random seed for reproducibility.
+            row (NamedTuple): A row from the dataframe containing the URL and place name.
             
         Returns:
             tuple: (selected_element, element_text, element_href)
@@ -130,7 +131,7 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
             walk = WalkMunicodeToc(self.page, self.place_name, self.output_folder)
 
             # Walk the nested menu and save the results.
-            df: pd.DataFrame = await walk.nested_menu(self.NODE_ID_SELECTOR)
+            df: pd.DataFrame = await walk.nested_menu(self.NODE_ID_SELECTOR, row)
             logger.info("Walk of Municode ToC menu finished.")
             logger.debug(f"df\n{df.head()}",f=True)
 
