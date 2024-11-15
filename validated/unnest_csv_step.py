@@ -1,11 +1,17 @@
 
 import json
+import os
 import re
 from typing import NamedTuple
+import sys
 
 
 import ast
 import pandas as pd
+
+
+from config.config import OUTPUT_FOLDER
+from logger.logger import Logger
 
 
 def _flatten_children(row: NamedTuple) -> list[dict]:
@@ -63,6 +69,7 @@ def _flatten_children(row: NamedTuple) -> list[dict]:
     
     return flattened
 
+
 def unnest_csv(input_file: str | pd.DataFrame, output_file):
     """
     Un-nest a CSV file with a nested 'children' column.
@@ -107,4 +114,31 @@ def unnest_csv(input_file: str | pd.DataFrame, output_file):
     result_df.to_csv(output_file, index=False)
 
     return result_df
+
+
+def unnest_csv_step(df: pd.DataFrame=None, row: NamedTuple=None, logger=Logger, UNNEST_CSV_ROUTE: bool=False) -> None|pd.DataFrame:
+    if df is None:
+        if UNNEST_CSV_ROUTE:
+            logger.info("Performing unnesting of specified CSV files in output folder...")
+            for file in os.listdir(OUTPUT_FOLDER):
+                logger.debug(f"file: {file}")
+                base_name = os.path.basename(file)
+                if file.endswith("traversal_results.csv"):
+                    unnested_csv_path = os.path.join(OUTPUT_FOLDER, base_name.replace(".csv", "_unnested.csv"))
+                    try:
+                        unnest_csv(os.path.join(OUTPUT_FOLDER, file), unnested_csv_path)
+                    except Exception as e:
+                        logger.error(f"Error unnesting {file}: {e}")
+                        raise e
+            logger.debug("Finished unnesting CSV files. Exiting...")
+            sys.exit(0)
+    else:
+        if row is None:
+            raise ValueError("row cannot be None if df is not None")
+        else:
+            logger.info("Performing unnesting of input dataframe...")
+            place_name = row.place_name.replace(" ", "_").lower()
+            base_name = place_name + "_" + str(row.gnis) + "_menu_traversal_results_unnested.csv"
+            unnested_csv_path = os.path.join(OUTPUT_FOLDER, base_name)
+            return unnest_csv(df, unnested_csv_path)
 

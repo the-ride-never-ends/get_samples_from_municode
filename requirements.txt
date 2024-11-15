@@ -4,3 +4,5 @@ playwright
 requests
 pyyaml
 stdlib-list
+tiktoken
+scipy

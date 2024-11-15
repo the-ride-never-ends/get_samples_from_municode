@@ -2,6 +2,7 @@ import abc
 import asyncio
 from functools import wraps
 import os
+import re
 from typing import Any, Coroutine
 from urllib.robotparser import RobotFileParser
 from urllib.parse import urljoin, urlsplit, urlparse
@@ -299,6 +300,10 @@ class AsyncPlaywrightScrapper:
             AsyncPlaywrightTimeoutError: If the page fails to load within the specified timeout.
             AsyncPlaywrightError: If any other Playwright-related error occurs during navigation.
         """
+        # Clean up the URL.
+        if "%2C" in url:
+            url = re.sub("%2C", ",", url)
+
         # See if we're allowed to get the URL, as well as get the specified delay from robots.txt
         if not self.rp.can_fetch(self.user_agent, url):
             logger.warning(f"Cannot scrape URL '{url}' as it's disallowed in robots.txt")

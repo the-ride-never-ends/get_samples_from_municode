@@ -8,6 +8,7 @@ REM Echo to indicate the start of the Python script
 echo *** BEGIN PROGRAM ***
 
 REM Run the Python script
+REM python manual\screenshot_urls_with_commas_in_them.py
 python main.py
 
 REM Echo to indicate the end of the Python script
