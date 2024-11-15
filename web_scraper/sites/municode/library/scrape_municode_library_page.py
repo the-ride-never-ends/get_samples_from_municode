@@ -43,7 +43,7 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
                 domain: str,
                 pw_instance,
                 *args,
-                user_agent: str="*",
+                user_agent: str = "*",
                 **kwargs):
         super().__init__(domain, pw_instance, *args, user_agent=user_agent, **kwargs)
 
@@ -52,16 +52,17 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
             print(f"Creating output folder: {output_folder}")
             os.mkdir(output_folder)
 
-        self.output_folder:str = output_folder
-        self.place_name:str = sanitize_filename(domain)
+        self.output_folder: str = output_folder
+        self.place_name: str = sanitize_filename(domain)
 
 
     async def screen_shot_frontpage(self, page):
         """
         Take a screenshot of the frontpage
         """
+        file_path = os.path.join(self.output_folder, f"{self.place_name}_frontpage.png")
         await self.navigate_to(page, self.domain)
-        await self.page.screenshot(path=os.path.join(self.output_folder, f"{self.place_name}_frontpage.png"))
+        await self.page.screenshot(path=file_path)
         return
 
 
@@ -79,7 +80,7 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
             count_list.append(len(root_anchors))
         except (AsyncPlaywrightError, AsyncPlaywrightTimeoutError) as e:
             logger.error(f"Error selecting top-level node elements with root_selector {self.NODE_ID_SELECTOR}: {e}")
-        
+
         return count_list
 
 
@@ -110,8 +111,13 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
             logger.error(f"Unexpected error while downloading HTML from {url}: {e}")
         return
 
+    async def screenshot_if_no_menu_elements(self, row: str) -> None:
+        logger.info(f"Skipping URL: {row.url} because it errored. Taking screenshot and continuing to next row...")
+        await self.take_screenshot(filename=f"{sanitize_filename(row.url)}_{row.gnis}_no_menu_elements.png")
+        await self.close_current_page_and_context()
+        return None
 
-    async def scrape_municode_toc_menu(self, row: NamedTuple) -> pd.DataFrame:
+    async def scrape_municode_toc_menu(self, row: NamedTuple) -> pd.DataFrame|None:
         """
         Scrape a Table of Contents menu from Municode.
         
@@ -148,7 +154,8 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
 
         except (AsyncPlaywrightTimeoutError, AsyncPlaywrightError) as e:
             logger.error(f"Playwright Error in scrape_municode_toc_menu: {e}")
-            raise
+            await self.screenshot_if_no_menu_elements(row)
+            return None
         except Exception as e:
             logger.error(f"Error in scrape_municode_toc_menu: {e}")
             raise

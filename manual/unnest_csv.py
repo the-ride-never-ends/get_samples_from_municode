@@ -1,11 +1,14 @@
-import pandas as pd
-import ast
-import json
 
+import json
 import re
 from typing import NamedTuple
 
-def flatten_children(row: NamedTuple) -> list[dict]:
+
+import ast
+import pandas as pd
+
+
+def _flatten_children(row: NamedTuple) -> list[dict]:
     """
     Recursively flatten the children column of a dataframe row.
     
@@ -89,7 +92,7 @@ def unnest_csv(input_file: str | pd.DataFrame, output_file):
         if not isinstance(row, tuple) or not hasattr(row, '_fields'):
             raise TypeError(f"Row is not a NamedTuple but {type(row)}")
 
-        flattened_data.extend(flatten_children(row))
+        flattened_data.extend(_flatten_children(row))
 
     # Create new dataframe from flattened data
     result_df = pd.DataFrame(flattened_data)

@@ -26,10 +26,10 @@ def get_total_size_of_files_with_specified_type_in_gigabytes(directory: str, fil
             total_size += os.path.getsize(file_path)
 
     # Convert bytes to gigabytes
-    total_size_in_gbs = total_size / 1024 / 1024 / 1024 # byte -> kilobyte -> megabyte -> gigabyte
+    total_size_in_bytes = total_size # byte -> kilobyte -> megabyte -> gigabyte
 
     # Write the total size to a text file
     with open("total_size.txt", "w") as f:
-        f.write(f"Total size of {filetype} files in the directory: {total_size_in_gbs:.2f} GB")
+        f.write(f"Total size of {filetype} files in the directory: {total_size_in_bytes:.10f} bytes")
 
-    return total_size_in_gbs
+    return total_size_in_bytes

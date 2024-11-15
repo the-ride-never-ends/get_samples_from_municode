@@ -8,7 +8,7 @@ pd.DataFrame
 
 from typing import TypeVar
 
-import playwright.sync_api
+
 import playwright.async_api
 
 
@@ -17,9 +17,8 @@ from playwright.async_api import Browser as AsyncBrowser, Page as AsyncPage
 from playwright.sync_api import Browser as SyncBrowser, Page as SyncPage
 
 
-SeleniumWebDriver = TypeVar('SeleniumWebDriver')
 SyncPlaywrightBrowser = TypeVar('SyncPlaywrightBrowser')
-AyncPlaywrightBrowser = TypeVar('AyncPlaywrightBrowser')
+AsyncPlaywrightBrowser = TypeVar('AsyncPlaywrightBrowser')
 
 
 class AsyncAbstractBrowserController(ABC):

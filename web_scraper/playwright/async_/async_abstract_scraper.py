@@ -29,8 +29,8 @@ from abc import ABC, abstractmethod
 # from utils.manual.scrape_legal_websites_utils.fetch_robots_txt import fetch_robots_txt
 # from utils.manual.scrape_legal_websites_utils.parse_robots_txt import parse_robots_txt 
 # from utils.manual.scrape_legal_websites_utils.extract_urls_using_javascript import extract_urls_using_javascript
-from utils.manual.scrape_legal_websites_utils.can_fetch import can_fetch
-from utils.shared.decorators.try_except import try_except
+from web_scraper.utils.can_fetch import can_fetch
+from utils.shared.decorators.try_except import async_try_except, try_except
 
 from config.config import LEGAL_WEBSITE_DICT, OUTPUT_FOLDER
 
@@ -101,7 +101,7 @@ class PlaywrightScrapper:
         self.crawl_delay = int(self.rp.crawl_delay(self.user_agent))
         return
 
-
+    @async_try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
     async def _load_browser(self, pw_instance: AsyncPlaywright):
         """
         Launch a chromium instance and load a page
@@ -109,7 +109,6 @@ class PlaywrightScrapper:
         self._browser = await pw_instance.chromium.launch(**self.launch_kwargs)
 
 
-    @try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
     # Define the context manager methods
     @classmethod
     async def start(cls, pw_instance: AsyncPlaywright) -> 'PlaywrightScrapper':
@@ -119,7 +118,7 @@ class PlaywrightScrapper:
         return instance
 
 
-    @try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
+    @async_try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
     async def exit(self) -> None:
         """
         Close page and browser instances and reset internal attributes
@@ -170,28 +169,28 @@ class PlaywrightScrapper:
             await asyncio.sleep(self.crawl_delay)
         return await self.page.goto(url, **kwargs)
 
-    @try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
+    @async_try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
     async def wait_till_idle(self) -> Coroutine[Any, Any, None]:
         """
         Wait for a page to fully finish loading.
         """
         return await self.page.wait_for_load_state("networkidle")
 
-    @try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
+    @async_try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
     async def move_mouse_cursor_to_element(self, selector: str, *args, **kwargs) -> Coroutine[Any, Any, None]:
         """
         Move a "mouse" cursor over a specified element.
         """
         await self.page.locator(selector, *args, **kwargs).hover()
 
-    @try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
+    @async_try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
     async def click_on(self, selector: str, *args, **kwargs) -> Coroutine[Any, Any, None]:
         """
         Click on a specified element.
         """
         return await self.page.locator(selector, *args, **kwargs).click()
 
-    @try_except(exception=[PlaywrightTimeoutError, PlaywrightError])
+    @async_try_except(exception=[PlaywrightTimeoutError, PlaywrightError])
     async def take_screenshot(self,
                               filename: str,
                               full_page: bool=False,
@@ -244,7 +243,7 @@ class PlaywrightScrapper:
             subprocess.call(["mnt/c/Windows/explorer.exe", filepath], shell=True)
         return
 
-    @try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
+    @async_try_except(exception=[PlaywrightTimeoutError, PlaywrightError], raise_exception=True)
     async def evaluate_js(self, javascript: str, **js_args) -> Coroutine[Any]:
         """
         Evaluate a JavaScript code in the context of a page.
@@ -312,7 +311,7 @@ class AbstractScraper(ABC):
 
     #### START CLASS STARTUP AND EXIT METHODS ####
 
-    @try_except(exception=[URLError], retries=2, raise_exception=True)
+    @async_try_except(exception=[URLError], retries=2, raise_exception=True)
     def get_robot_rules(self):
         """
         Get the site's robots.txt file and assign it to the class' applicable attributes
