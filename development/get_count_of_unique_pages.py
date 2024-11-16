@@ -1,7 +1,7 @@
 from collections import defaultdict
 import time
 
-import tqdm
+from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -10,53 +10,6 @@ import pandas as pd
 
 from logger.logger import Logger
 logger = Logger(logger_name=__name__)
-
-
-
-def build_hierarchy(df: pd.DataFrame) -> dict[str, set[str]]:
-    """
-    Builds a proper parent-child hierarchy.
-    """
-    # Create direct parent-child relationships
-    children = defaultdict(set)
-    for row in df.itertuples():
-        if row.parent_text:  # Only add if there's a parent
-            children[row.parent_text].add(row.text)
-    return children
-
-
-def get_depth(text: str, df: pd.DataFrame) -> int:
-    """Get the depth of a node from the DataFrame."""
-    matches = df[df['text'] == text]['depth']
-    return matches.iloc[0] if not matches.empty else 0
-
-
-def get_descendants_by_depth(node: str, depth_target: int, current_depth: int, 
-                           children: dict[str, set[str]], df: pd.DataFrame, 
-                           cache: dict[str, set[str]]) -> set[str]:
-    """
-    Gets descendants at a specific depth using child relationships.
-    Uses caching to avoid recomputing.
-    """
-    cache_key = f"{node}:{depth_target}"
-    if cache_key in cache:
-        return cache[cache_key]
-
-    if current_depth == depth_target:
-        result = {node}
-    elif current_depth > depth_target:
-        result = set()
-    else:
-        result = set()
-        for child in children.get(node, set()):
-            child_depth = get_depth(child, df)
-            result.update(get_descendants_by_depth(
-                child, depth_target, child_depth,
-                children, df, cache
-            ))
-
-    cache[cache_key] = result
-    return result
 
 
 # def graph_family_tree(family_tree: nx.DiGraph, penultimate_descendants: set[list]) -> None:
@@ -101,7 +54,7 @@ def get_penultimate_descendants(unnested_df: pd.DataFrame) -> int:
     ultimate_descendants = [
         node for node in family_tree.nodes if len(list(family_tree.successors(node))) == 0
     ]
-    logger.debug(f"Ultimate Descendants (e.g. total Lines in CSV minus 1): {ultimate_descendants}", off=True)
+    logger.debug(f"Found Ultimate Descendants (e.g. total Lines in CSV minus 1): {ultimate_descendants}", off=True)
 
     # Identify penultimate descendants (parents of ultimate descendants)
     penultimate_descendants = set()

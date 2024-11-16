@@ -28,121 +28,30 @@ UNNEST_CSV_ROUTE = False
 from development.pandas_dataframe_row import MuniRow
 
 
-def row_is_in_this_dataframe(value: Any, column: str, df: pd.DataFrame) -> bool:
-    """
-    Check if a value exists in a specific column of a pandas DataFrame.
-
-    Args:
-        value (Any): The value to search for.
-        column (str): The column name to search in.
-        df (pd.DataFrame): The pandas DataFrame to search.
-
-    Returns:
-        bool: True if the value is found, False otherwise.
-    """
-    return value in df[column].values
+from development.row_is_in_this_dataframe import row_is_in_this_dataframe
 
 from validated.append_pandas_row_to_csv import append_pandas_row_to_csv
 
 
-import statistics as st
-
-from bs4 import BeautifulSoup
-import tiktoken as tk
-
-
-import tqdm
-
-
-def estimate_total_tokens_from_html_files():
-    """
-    Example
-        chunk_texts = get_stats_from_saved_html()
-        for i, text in enumerate(chunk_texts, 1):
-            print(f"Chunk {i}: {text[:100]}...")  # Print first 100 characters of each chunk
-    """
-    # Define constants
-    class_ = "chunk-content-wrapper"
-    dir_path = os.path.join(OUTPUT_FOLDER, "scrape_municode_library_page")
-    encoding = tk.encoding_for_model("gpt-4o")
-
-    # Initialize variables
-    average_tokens_per_file = []
-    total_tokens = []
-
-    # Get the html files in the directory and how many of them there are.
-    html_files = [file for file in os.listdir(dir_path) if file.endswith(".html")]
-
-
-    for file in tqdm.tqdm(html_files, desc="Processing HTML files", unit="file"):
-        #logger.info(f"Processing file: {file}")
-        html_chunk_content = []
-
-        # Read the HTML file
-        with open(os.path.join(dir_path, file), "r", encoding="utf-8") as f:
-            html_content = f.read()
-
-        # Parse it.
-        soup = BeautifulSoup(html_content, "html.parser")
-
-        # Find all elements with class 'chunk-content-wrapper'
-        chunk_content_wrappers = soup.find_all(class_=class_)
-        if chunk_content_wrappers == 0:
-            print(f"No text under class '{class_}' found in HTML. Skipping...")
-            continue
-
-        total_num_wrappers = len(chunk_content_wrappers)
-
-        # Get the token count for each text.
-        # NOTE We don't need the tokens themselves, just how many of them there are.
-        html_chunk_content = [
-            len(encoding.encode(wrapper.get_text(strip=True))) for wrapper in chunk_content_wrappers
-        ]
-
-        # Calculate basic statistics for this HTML file.
-        total_tokens_in_file = sum(html_chunk_content)
-        if total_num_wrappers > 0:
-            average_tokens_per_chunk = total_tokens_in_file / total_num_wrappers # Average
-        else:
-            average_tokens_per_chunk = 0
-
-        total_tokens.append(total_tokens_in_file)
-        average_tokens_per_file.append(average_tokens_per_chunk) 
-
-        logger.info(f"""
-        HTML File: {file}
-        Total chunks: {total_num_wrappers:,}
-        Total tokens: {total_tokens_in_file:,}
-        Average tokens per chunk: {average_tokens_per_chunk:,}
-        """,f=True,off=True)
-
-    average_per_file = sum(total_tokens) / len(html_files) if html_files else 0
-
-    logger.info(f"""
-    Total HTML Files: {len(html_files):,}
-    Total tokens: {sum(total_tokens):,}
-    Average tokens per file: {average_per_file:,}
-    """,f=True)
-
-    return average_per_file
-
-
-
-
-
-
+from development.estimate_average_tokens_per_page_from_html_files import (
+    estimate_average_tokens_per_page_from_html_files
+)
 from development.get_count_of_unique_pages import get_count_of_unique_pages
 from development.get_stats_of_html_files_in_this_directory import (
     get_stats_of_html_files_in_this_directory
 )
 
-def calculate_stats_for_urls_per_municode_library_page_csv(csv_ending: str = "_unnested.csv") -> None:
 
+import statistics as st
+
+def calculate_stats_for_urls_per_municode_library_page_csv(csv_ending: str = "_unnested.csv") -> None:
 
     # Initialize counts and constants
     TOTAL_MUNICODE_SOURCE_URLS = 3528
+    MUNICODE_ROBOTS_TXT_CRAWL_DELAY = 15
     COST_PER_GIGABYTE_IN_DOLLARS = 8.4
-    est_tokens_per_unique_page = estimate_total_tokens_from_html_files()
+    class_ = "chunk-content-wrapper" # This is the HTML class in Municode library pages that contains the text we want to scrape.
+    est_tokens_per_unique_page = estimate_average_tokens_per_page_from_html_files(class_=class_)
     csv_count = 0
     url_count_list = []
 
@@ -157,9 +66,6 @@ def calculate_stats_for_urls_per_municode_library_page_csv(csv_ending: str = "_u
     html_folder = os.path.join(OUTPUT_FOLDER, 'scrape_municode_library_page')
     average_file_size = get_stats_of_html_files_in_this_directory(html_folder)
 
-  
-
-
     # Calculate the stats then print.
     url_count = sum(url_count_list) # N
     url_count_mean = st.mean(url_count_list).__round__() # Mean
@@ -167,11 +73,13 @@ def calculate_stats_for_urls_per_municode_library_page_csv(csv_ending: str = "_u
     url_count_mode = st.mode(url_count_list) # Mode
     url_count_standard_deviation = st.stdev(url_count_list).__round__() # Standard Deviation
 
-    est_total_urls = round(url_count_mean * TOTAL_MUNICODE_SOURCE_URLS)
-    est_total_tokens = round(est_total_urls * est_tokens_per_unique_page)
+    est_total_unique_urls = round(url_count_mean * TOTAL_MUNICODE_SOURCE_URLS)
+    est_total_tokens = round(est_total_unique_urls * est_tokens_per_unique_page)
 
-    total_size_of_municode_in_gigabytes = url_count_mean * average_file_size
-    total_cost_to_scrape = total_size_of_municode_in_gigabytes / COST_PER_GIGABYTE_IN_DOLLARS
+    total_size_of_municode_in_gigabytes = est_total_unique_urls * average_file_size
+    total_cost_to_scrape = total_size_of_municode_in_gigabytes * COST_PER_GIGABYTE_IN_DOLLARS
+
+    time_in_days = MUNICODE_ROBOTS_TXT_CRAWL_DELAY * est_total_unique_urls / 60 / 60 / 24
 
     logger.info(f"""
     Unique Pages per municode library page CSV:
@@ -179,25 +87,19 @@ def calculate_stats_for_urls_per_municode_library_page_csv(csv_ending: str = "_u
     - Median: {url_count_median:,}
     - Mode: {url_count_mode:,}
     - Standard Deviation: {url_count_standard_deviation:,}
-    - Estimated Number of Token per Unique Page: {est_tokens_per_unique_page:,}
+    - Estimated Number of Token per Unique Page: {est_tokens_per_unique_page:,.2f} tokens
     - Mean Filesize: {average_file_size:.2f} gigabytes
     ############################
     - Total CSV count: {csv_count:,}
     - Total Unique Page count: {url_count:,}
     - Estimated Size of Unique Pages on Municode: {total_size_of_municode_in_gigabytes:.2f} gigabytes
-    - Estimated Total Unique Pages on Municode: {est_total_urls:,}
-    - Estimated Total Tokens on Municode (assuming {est_tokens_per_unique_page:,} per library page): {est_total_tokens:,}
-    - Total Cost to Scrape at ${COST_PER_GIGABYTE_IN_DOLLARS:.2f} USD per gigabyte: ${total_cost_to_scrape:,.2f} USD
+    - Estimated Total Unique Pages on Municode: {est_total_unique_urls:,}
+    - Estimated Total Tokens on Municode (assuming {est_tokens_per_unique_page:,.2f} per library page): {est_total_tokens:,}
+    - Total Cost to Scrape with Proxies at ${COST_PER_GIGABYTE_IN_DOLLARS:.2f} USD per gigabyte: ${total_cost_to_scrape:,.2f} USD
+    - Total Time to Scrape Concurrently without Proxies (15 second delay per robots.txt): {time_in_days:.2f} days
     """,f=True, t=60)
     print("Exiting...")
     return
-
-
-
-# place_name = row.place_name.replace(" ", "_").lower()
-# filename = f"{place_name}_{row.gnis}_menu_traversal_results.csv"
-# file_path = os.path.join(OUTPUT_FOLDER, filename)
-# logger.debug(f"filename: {filename}", off=True)
 
 
 MANUAL_USE = True
