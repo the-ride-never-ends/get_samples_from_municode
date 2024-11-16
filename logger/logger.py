@@ -1,32 +1,44 @@
 """
 Module for the custom logging class.
 
-Includes:
-1. A Logger class that creates loggers with dynamic log folder generation and routing capabilities.
-2. A specialized prompt logger for use within LLM engines.
-3. Utility functions for managing log files and generating unique IDs.
-4. Configuration handling for log levels and global settings.
+This module provides a comprehensive logging solution with dynamic log folder generation,
+routing capabilities, and specialized prompt logging for LLM engines.
 
-The module sets up logging based on a configuration file (config.yaml) or falls back to default settings.
-It supports various log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL) and provides methods to log
-messages with different severities. The Logger class can be instantiated with custom names, batch IDs,
-and log levels, making it flexible for different parts of an application.
+Key Components:
+1. Logger Class: Creates loggers with customizable settings and methods for various log levels.
+2. Prompt Logger: Specialized logger for use within LLM engines.
+3. Utility Functions: Manage log files and generate unique IDs.
+4. Configuration Handling: Manages log levels and global settings via config.yaml or defaults.
 
-Key features:
-- Dynamic log file and folder creation
-- Configurable log levels
-- Special handling for prompt logging in LLM contexts
-- Automatic formatting of log messages
+Features:
+- Dynamic creation of log files and folders
+- Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Flexible instantiation with custom names, batch IDs, and log levels
+- Automatic message formatting and log routing
 - Support for both file and console logging
+- Signal handling for graceful shutdown and log file completion
+- Automatic management of log file sizes and cleanup of empty files and folders
 
-Usage:
+Configuration:
+- Uses config.yaml for settings, with fallback to default values
+- Allows forcing a global log level for the entire program
+
+Usage Example:
     from logger.logger import Logger
     logger = Logger(logger_name="my_app")
     logger.info("Application started")
     logger.debug("Debug information")
     logger.error("An error occurred")
 
-Note: This module requires the 'yaml' package for configuration file parsing.
+Advanced Usage:
+    logger.info("Important message", f=True)  # Formats message with asterisks
+    logger.debug("Pausing after this", t=2)   # Pauses execution for 2 seconds after logging
+    logger.warning("Silent warning", off=True)  # Logs message but doesn't print to console
+
+Note: 
+- Requires the 'yaml' package for parsing the configuration file.
+- The 'q' parameter in logging methods is deprecated due to Python's limitations 
+  in differentiating between regular and formatted strings at runtime.
 """
 from datetime import datetime
 import logging
@@ -41,23 +53,36 @@ import uuid
 import yaml
 
 
-from .utils.logger.delete_empty_log_files import delete_empty_log_files, delete_zone_identifier_files
+from .utils.logger.delete_logs_if_they_get_too_big_on_disk import (
+    delete_logs_if_they_get_too_big_on_disk
+)
+from .utils.logger.delete_empty_folders_in import delete_empty_folders_in
+from .utils.logger.delete_empty_files_in import delete_empty_files_in
+
 
 def make_id():
     return str(uuid.uuid4())
 
+
 # Define general folder for log files
 script_dir = os.path.dirname(os.path.realpath(__file__))
-PROJECT_ROOT = PROGRAM_NAME = os.path.dirname(script_dir)
+PROJECT_ROOT = os.path.dirname(script_dir)
+PROGRAM_NAME = os.path.basename(PROJECT_ROOT)
 debug_log_folder = os.path.join(PROJECT_ROOT, "debug_logs")
 
-# Import DEBUG config
-# We do a separate yaml import to avoid circular imports with the config file.
 
+# Clean up debug folders.
+delete_empty_files_in(debug_log_folder, ".log")
+delete_empty_files_in(script_dir, '.Identifier')
+max_size_in_megabytes = 200
+delete_logs_if_they_get_too_big_on_disk(debug_log_folder, max_size_in_megabytes)
+delete_empty_folders_in(debug_log_folder)
+
+
+# Import DEBUG config
+# NOTE We do a separate yaml import to avoid circular imports with the config file.
 config_path = os.path.join(PROJECT_ROOT, 'config.yaml')
 try:
-    delete_empty_log_files(debug_log_folder)
-    delete_zone_identifier_files(script_dir)
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     DEFAULT_LOG_LEVEL = config['SYSTEM']['DEFAULT_LOG_LEVEL']
@@ -87,12 +112,13 @@ class Logger:
     Includes a specialized prompt logger for use within LLM engines.
 
     Parameters:
-        logger_name: (str) Name for the logger. Defaults to the program's name i.e. the top-level directory's name.
-        prompt_name: (str) Name of a prompt. Used by the prompt logger. Defaults to "prompt_log".
-        batch_id: (str) The logger's batch id. Used by the prompt logger. Defaults to random UUID4 string.
-        current_time: (datetime) The time a logger is initialized. Defaults to now() in "%Y-%m-%d_%H-%M-%S" format.
+        logger_name (str): Name for the logger. Defaults to the program's name (top-level directory's name).
+        prompt_name (str): Name of a prompt. Used by the prompt logger. Defaults to "prompt_log".
+        batch_id (str): The logger's batch id. Used by the prompt logger. Defaults to random UUID4 string.
+        current_time (datetime): The time a logger is initialized. Defaults to now() in "%Y-%m-%d_%H-%M-%S" format.
         log_level (int): The logging level. Defaults to DEFAULT_LOG_LEVEL from config or logging.DEBUG if config is unavailable.
         stacklevel (int): The depth of function calls for determining log origin. Defaults to None.
+
     Attributes:
         logger_name (str): The name of the logger.
         prompt_name (str): The name of the prompt (for prompt logging).
@@ -104,15 +130,24 @@ class Logger:
         logger (logging.Logger): The underlying Python logger object.
         filename (str): The name of the log file.
         filepath (str): The full path to the log file.
+        file_handler (logging.FileHandler): Handler for writing logs to a file.
         asterisk (str): Formatting string with asterisks.
         line (str): Formatting string with dashes.
+        exception_symbol (str): Symbol used for exception logging.
+        shutting_down (bool): Flag to indicate if the logger is shutting down.
+
     Methods:
-        info(message, f=False, q=True): Log a message with severity 'INFO'.
-        debug(message, f=False, q=True): Log a message with severity 'DEBUG'.
-        warning(message, f=False, q=True): Log a message with severity 'WARNING'.
-        error(message, f=False, q=True): Log a message with severity 'ERROR'.
-        critical(message, f=False, q=True): Log a message with severity 'CRITICAL'.
-        exception(message, f=False, q=True): Log a message with severity 'ERROR', including exception information.
+        info(message, f=False, q=True, t=None, off=False): Log a message with severity 'INFO'.
+        debug(message, f=False, q=True, t=None, off=False): Log a message with severity 'DEBUG'.
+        warning(message, f=False, q=True, t=None, off=False): Log a message with severity 'WARNING'.
+        error(message, f=False, q=True, t=None, off=False): Log a message with severity 'ERROR'.
+        critical(message, f=False, q=True, t=None, off=False): Log a message with severity 'CRITICAL'.
+        exception(message, f=False, q=True, t=None, off=False): Log a message with severity 'ERROR', including exception information.
+        _setup_signal_handlers(): Register signal handlers for graceful shutdown.
+        _handle_shutdown_signal(signum, frame): Handle shutdown signals.
+        _cleanup(): Clean up logging resources on exit.
+        _f(message): Format the message with asterisks.
+        _message_template(message, method, f, q, t, off): Template for formatting and logging messages.
 
     Example:
         >>> from logger.logger import Logger
@@ -122,9 +157,12 @@ class Logger:
         '2024-09-18 18:38:44,185 - example_logger - INFO - example.py: 4 - Hello world!'
 
     Note:
-        The class uses the following log levels:
+        - The class uses the following log levels:
         CRITICAL = 50, ERROR = 40, WARNING = 30, INFO = 20, DEBUG = 10, NOTSET = 0
-        FATAL is an alias for CRITICAL, and WARN is an alias for WARNING.
+        - FATAL is an alias for CRITICAL, and WARN is an alias for WARNING.
+        - The 'q' parameter in logging methods is deprecated due to Python's inability to differentiate 
+          between regular and formatted strings at runtime.
+        - The class includes signal handling for graceful shutdown on SIGINT and SIGTERM signals.
     """
 
     def __init__(self,
@@ -146,7 +184,7 @@ class Logger:
         self.filename = None
         self.filepath = None
         self.file_handler = None
-        # Formating variables.
+        # Formatting variables.
         self.asterisk = "\n********************\n"
         self.line = "\n--------------------\n"
         self.exception_symbol = None
@@ -329,7 +367,3 @@ class Logger:
         """
         self._message_template(message, self.logger.exception, f, q, t, off)
 
-###############################
-
-# Create singletons of the loggers.
-#logger = Logger()

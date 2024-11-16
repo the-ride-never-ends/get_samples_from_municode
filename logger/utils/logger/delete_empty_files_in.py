@@ -11,26 +11,23 @@ import os
 # os.walk('C:\dir1\dir2\startdir').next()[1] # returns all the dirs in 'C:\dir1\dir2\startdir'
 # os.walk('C:\dir1\dir2\startdir').next()[2] # returns all the files in 'C:\dir1\dir2\startdir'
 
-
-# Auto-clean the debug folder of empty text files.
-def delete_empty_log_files(root_folder):
+# Auto-clean the specified directory of empty files.
+def delete_empty_files_in(root_folder, file_ending):
+    """
+    Delete empty files (i.e. file size == 0) with the specified ending
+    from the every folder under the specified directory.
+    """
+    count = 0
     for root, _, filenames in os.walk(root_folder):
         for filename in filenames:
-            if filename.endswith('.log'):
+            if filename.endswith(file_ending):
                 file_path = os.path.join(root, filename)
                 if os.path.getsize(file_path) == 0: # 0kb
-                    os.remove(file_path)
-                    print(f"Deleted empty file: {file_path}")
-
-
-# Auto-clean the debug folder of empty text files.
-def delete_zone_identifier_files(root_folder):
-    for root, _, filenames in os.walk(root_folder):
-        for filename in filenames:
-            if filename.endswith('.Identifier'):
-                file_path = os.path.join(root, filename)
-                if os.path.getsize(file_path) == 0: # 0kb
-                    os.remove(file_path)
-                    print(f"Deleted empty file: {file_path}")
-
-
+                    try:
+                        os.remove(file_path)
+                        count += 1
+                    except Exception as e:
+                        print(f"Error deleting file {file_path}: {e}")
+                        continue
+    print(f"Deleted {count} files with '{file_ending}' ending.")
+    return

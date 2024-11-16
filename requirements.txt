@@ -6,3 +6,7 @@ pyyaml
 stdlib-list
 tiktoken
 scipy
+networkx
+matplotlib
+#Graphviz
+#pygraphviz 

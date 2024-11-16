@@ -37,7 +37,6 @@ def _flatten_children(row: NamedTuple) -> list[dict]:
     }
     flattened.append(root_record)
 
-
     def _flatten(item: dict, parent_text: str = None):
         # Create a record for the current item
         record = {
@@ -107,6 +106,9 @@ def unnest_csv(input_file: str | pd.DataFrame, output_file):
     # Regex the text column to remove large spaces leftover from the scraping process.
     result_df['text'] = result_df['text'].apply(lambda text: re.sub(r'\s{2,}', ' ', text) if isinstance(text, str) else text)
 
+    # Ditto for the parent text column.
+    result_df['parent_text'] = result_df['parent_text'].apply(lambda text: re.sub(r'\s{2,}', ' ', text) if isinstance(text, str) else text)
+
     # Sort by depth to ensure proper hierarchy in output
     result_df = result_df.sort_values('depth').reset_index(drop=True)
 
@@ -126,7 +128,7 @@ def unnest_csv_step(df: pd.DataFrame=None, row: NamedTuple=None, logger=Logger, 
                 if file.endswith("traversal_results.csv"):
                     unnested_csv_path = os.path.join(OUTPUT_FOLDER, base_name.replace(".csv", "_unnested.csv"))
                     try:
-                        unnest_csv(os.path.join(OUTPUT_FOLDER, file), unnested_csv_path)
+                        unnested_df = unnest_csv(os.path.join(OUTPUT_FOLDER, file), unnested_csv_path)
                     except Exception as e:
                         logger.error(f"Error unnesting {file}: {e}")
                         raise e
@@ -140,5 +142,6 @@ def unnest_csv_step(df: pd.DataFrame=None, row: NamedTuple=None, logger=Logger, 
             place_name = row.place_name.replace(" ", "_").lower()
             base_name = place_name + "_" + str(row.gnis) + "_menu_traversal_results_unnested.csv"
             unnested_csv_path = os.path.join(OUTPUT_FOLDER, base_name)
-            return unnest_csv(df, unnested_csv_path)
+            unnested_df = unnest_csv(df, unnested_csv_path)
+    return unnested_df
 

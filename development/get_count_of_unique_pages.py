@@ -1,13 +1,19 @@
-import pandas as pd
 from collections import defaultdict
-from typing import Dict, Set
+import time
+
+import tqdm
+
+import matplotlib.pyplot as plt
+import networkx as nx
+import pandas as pd
 
 
 from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
 
-def build_hierarchy(df: pd.DataFrame) -> Dict[str, Set[str]]:
+
+def build_hierarchy(df: pd.DataFrame) -> dict[str, set[str]]:
     """
     Builds a proper parent-child hierarchy.
     """
@@ -26,8 +32,8 @@ def get_depth(text: str, df: pd.DataFrame) -> int:
 
 
 def get_descendants_by_depth(node: str, depth_target: int, current_depth: int, 
-                           children: Dict[str, Set[str]], df: pd.DataFrame, 
-                           cache: Dict[str, Set[str]]) -> Set[str]:
+                           children: dict[str, set[str]], df: pd.DataFrame, 
+                           cache: dict[str, set[str]]) -> set[str]:
     """
     Gets descendants at a specific depth using child relationships.
     Uses caching to avoid recomputing.
@@ -52,51 +58,69 @@ def get_descendants_by_depth(node: str, depth_target: int, current_depth: int,
     cache[cache_key] = result
     return result
 
-def get_penultimate_counts(df: pd.DataFrame) -> Dict[str, int]:
+
+# def graph_family_tree(family_tree: nx.DiGraph, penultimate_descendants: set[list]) -> None:
+#     # Draw the graph with penultimate descendants colored red
+#     pos = nx.nx_agraph.graphviz_layout(family_tree, prog="dot")
+#     plt.figure(figsize=(12, 8))
+
+#     node_colors = [
+#         "red" if node in penultimate_descendants else "lightblue" for node in family_tree.nodes
+#     ]
+#     nx.draw(
+#         family_tree,
+#         pos,
+#         with_labels=True,
+#         node_size=3000,
+#         node_color=node_colors,
+#         font_size=10,
+#         font_weight="bold",
+#     )
+#     plt.title("Debugged Family Tree with Penultimate Descendants Highlighted")
+#     plt.show()
+#     time.sleep(10)
+#     return
+
+
+def get_penultimate_descendants(unnested_df: pd.DataFrame) -> int:
     """
-    Returns counts of descendants at penultimate levels for each URL.
+    Debug, identify, and print penultimate descendants in the family tree.
+
+    :param csv_data: DataFrame containing 'name', 'parent', and 'depth' columns
     """
-    # Build proper hierarchy
-    children = build_hierarchy(df)
-    cache = {}
-    
-    # Get max depth for each root
-    results = {}
-    
-    for row in df.itertuples():
-        node = row.text
-        node_depth = row.depth
-        
-        # Find maximum depth of descendants
-        max_descendant_depth = node_depth
-        for potential_depth in range(node_depth + 1, df['depth'].max() + 1):
-            descendants = get_descendants_by_depth(
-                node, potential_depth, node_depth,
-                children, df, cache
-            )
-            if descendants:
-                max_descendant_depth = potential_depth
-        
-        # If node has descendants beyond its depth,
-        # count those at penultimate level
-        if max_descendant_depth > node_depth:
-            penultimate_depth = max_descendant_depth - 1
-            penultimate_descendants = get_descendants_by_depth(
-                node, penultimate_depth, node_depth,
-                children, df, cache
-            )
-            if penultimate_descendants:
-                results[node] = len(penultimate_descendants)
-    
-    return results
+    # Create a directed graph
+    family_tree = nx.DiGraph()
+
+    # Add nodes and edges based on the CSV data
+    for row in unnested_df.itertuples(index=False):
+        family_tree.add_node(row.text)
+        if row.parent_text and row.parent_text != "None":
+            family_tree.add_edge(row.parent_text, row.text)
+
+    # Identify ultimate descendants (nodes with no children)
+    ultimate_descendants = [
+        node for node in family_tree.nodes if len(list(family_tree.successors(node))) == 0
+    ]
+    logger.debug(f"Ultimate Descendants (e.g. total Lines in CSV minus 1): {ultimate_descendants}", off=True)
+
+    # Identify penultimate descendants (parents of ultimate descendants)
+    penultimate_descendants = set()
+    for ultimate in ultimate_descendants:
+        parents = list(family_tree.predecessors(ultimate))
+        penultimate_descendants.update(parents)
+
+    # Print penultimate descendants to the console
+    logger.debug(f"penultimate_descendants: {penultimate_descendants}",f=True,off=True)
+
+    num_penultimate_descendants = len(penultimate_descendants)
+    logger.info(f"Number of Penultimate Descendants: {num_penultimate_descendants}",f=True,off=True)
+
+    #graph_family_tree(family_tree, penultimate_descendants)
+
+    return num_penultimate_descendants
 
 
-def get_level_zero_counts(df: pd.DataFrame) -> Dict[str, int]:
-    for row in df.itertuples():
-        if row.depth == 0:
-            
-
-def get_count_of_unique_pages(filepath: str) -> dict[str, int]:
+def get_count_of_unique_pages(filepath: str) -> int:
     """
     Get a count of the unique pages for a given Municode library page.
     A unique page is defined as a URL that is at the 2nd to last level of a parent hierarchy.
@@ -114,13 +138,8 @@ def get_count_of_unique_pages(filepath: str) -> dict[str, int]:
             for url, count in sorted(counts.items()):
                 print(f"{url}: {count}")
     """
-    data = pd.read_csv(filepath)
-    count_dicts = get_penultimate_counts(data)
-    logger.info(f"Count dicts: {count_dicts}", t=30)
-    count_tuples = list(count_dicts.values())
-    logger.info(f"Count tuples: {count_tuples}", t=30)
+    unnested_df = pd.read_csv(filepath)
 
-    output_count = [tup for tup in count_tuples]
-    output_count = sum(count_tuples)
+    num_penultimate_descendants = get_penultimate_descendants(unnested_df)
 
-    return output_count
+    return num_penultimate_descendants
