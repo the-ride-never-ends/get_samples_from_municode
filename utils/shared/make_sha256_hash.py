@@ -10,6 +10,7 @@ def make_sha256_hash(*args) -> str:
     NOTE: The order of the args tuple changes the output hash. 
 
     NOTE: url_hash = gnis + url, NOT url + gnis
+    NOTE: query_hash = gnis + query_text + SEARCH_ENGINE
 
     Args:
         args: Variable length argument tuple. Can be any type that can be converted to a string.

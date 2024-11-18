@@ -69,9 +69,9 @@ def _get_csv_rows_from_dataclass_values(dataclass: Any | list[Any] | dict[str, A
     # Type check, then convert the dataclass to a 2D list of dictionaries.
     if isinstance(dataclass, list):
         if not dataclass:
-            raise ValueError("Empty list provided")
+            ValueError("Empty list provided")
         if not is_dataclass(dataclass[0]):
-            raise ValueError(f"List items must be dataclasses, got {type(dataclass[0]).__name__}")
+            ValueError(f"List items must be dataclasses, got {type(dataclass[0]).__name__}")
         return [_convert_dataclass_to_dict(obj) for obj in dataclass]
 
     elif is_dataclass(dataclass):
@@ -81,7 +81,7 @@ def _get_csv_rows_from_dataclass_values(dataclass: Any | list[Any] | dict[str, A
         return [{k: _convert_dataclass_to_dict(v) if is_dataclass(v) else v 
                 for k, v in dataclass.items()}]
     else:
-        raise ValueError(f"'{dataclass.__class__.__name__}' is not supported.\nPlease provide a dataclass, list of dataclasses, or a dictionary of dataclasses.")
+        ValueError(f"'{dataclass.__class__.__name__}' is not supported.\nPlease provide a dataclass, list of dataclasses, or a dictionary of dataclasses.")
 
 
 def _get_csv_headers_from_dataclass_keys(dataclass: Any|list[Any]|dict[str, Any]) -> list[str]:
@@ -134,14 +134,19 @@ def save_dataclass_to_csv_via_pandas(dataclass: Any|list[Any]|dict[str, Any],
     filepath = os.path.join(OUTPUT_FOLDER, filename)
     print("Converting dataclass to pandas DataFrame...")
 
-    rows: list[dict] = _get_csv_rows_from_dataclass_values(dataclass)
+    try:
+        rows: list[dict] = _get_csv_rows_from_dataclass_values(dataclass)
 
-    dataclass = dataclass[0] if isinstance(dataclass, list) else dataclass
-    headers: list[str] = _get_csv_headers_from_dataclass_keys(dataclass)
+        dataclass = dataclass[0] if isinstance(dataclass, list) else dataclass
+        headers: list[str] = _get_csv_headers_from_dataclass_keys(dataclass)
 
-    df = pd.DataFrame.from_records(rows, columns=headers)
+        df = pd.DataFrame.from_records(rows, columns=headers)
+        print(f"Saving DataFrame CSV to '{filepath}'...")
+        df.to_csv(filepath, index=index, encoding=encoding)
+        print("CSV saved successfully.")
+        return df if return_df else None
+    except Exception as e:
+        Exception(f"Error converting dataclass to pandas DataFrame: {e}")
+        return None
 
-    print(f"Saving DataFrame CSV to '{filepath}'...")
-    df.to_csv(filepath, index=index, encoding=encoding)
-    print("CSV saved successfully.")
-    return df if return_df else None
+

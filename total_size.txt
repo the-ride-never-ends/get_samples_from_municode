@@ -1,1 +1,1 @@
-Total size of html files in the directory: 0.0220514630 gigabytes
+Total size of html files in the directory: 0.0358500311 gigabytes
