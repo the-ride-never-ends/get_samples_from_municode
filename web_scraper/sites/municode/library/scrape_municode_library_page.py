@@ -84,12 +84,12 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScraper):
         return count_list
 
 
-    async def download_html_to_disk(self, url: str) -> None:
+    async def download_html_to_disk(self, url: str, idx: int=None) -> None:
         """
         Navigate to the given URL and download the HTML content to disk.
         """
         try:
-            await self.navigate_to(url)
+            await self.navigate_to(url, idx=idx)
 
             # Get the HTML content
             html_content = await self.page.content()

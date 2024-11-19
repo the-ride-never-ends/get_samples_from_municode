@@ -46,7 +46,7 @@ from development.calculate_stats_for_urls_per_municode_library_page_csv import (
 
 from database.MySqlDatabase import MySqlDatabase
 
-MANUAL_USE = True
+MANUAL_USE = False
 
 async def main():
 
@@ -64,7 +64,6 @@ async def main():
 
         sys.exit(0)
 
-    # unnest_csv_step(logger=logger, UNNEST_CSV_ROUTE=True)
 
     next_step("Step 1. Get URLs from the CSV.")
     name = ["gnis, place_name, url"]
@@ -82,9 +81,10 @@ async def main():
             headless=False
         )
 
-        for row in input_urls_df.itertuples(): 
+        len_input_urls_df = len(input_urls_df)
+        for idx, row in enumerate(input_urls_df.itertuples(), start=1): 
             # -> NamedTuple(Index=0, gnis=12345, place_name='City of Example', url='https://example.com'):
-            logger.info(f"Processing URL: {row.url}")
+            logger.info(f"Processing URL {idx} of {len_input_urls_df}: {row.url}")
 
             if row_is_in_this_dataframe(row.gnis, 'gnis', output_urls_df):
                 logger.info(f"Skipping URL: {row.url} because the GNIS {row.gnis} is already in the output_urls.csv file")
@@ -96,7 +96,7 @@ async def main():
                 continue
 
             next_step("Step 2.1 Go to each URL.")
-            await scraper.navigate_to(url=row.url)
+            await scraper.navigate_to(url=row.url, idx=idx)
 
             next_step("Step 2.2 Count number of top-level menu elements.")
             count_list = await scraper.count_top_level_menu_elements(count_list)

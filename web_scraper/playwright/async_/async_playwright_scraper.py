@@ -283,7 +283,7 @@ class AsyncPlaywrightScraper:
     # These function's put all the small bits together.
 
     @try_except(exception=[AsyncPlaywrightTimeoutError, AsyncPlaywrightError])
-    async def navigate_to(self, url: str, idx: int=None, **kwargs) -> Coroutine:
+    async def navigate_to(self, url: str, idx: int = None, **kwargs) -> Coroutine:
         """
         Open a specified webpage and wait for any dynamic elements to load.
         This method respects robots.txt rules (e.g. not scrape disallowed URLs, respects crawl delays).
