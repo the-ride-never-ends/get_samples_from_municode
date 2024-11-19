@@ -72,6 +72,7 @@ async def main():
     input_urls_df: pd.DataFrame = pd.read_csv(os.path.join(INPUT_FOLDER, ("input_urls.csv")))
     output_urls_df: pd.DataFrame = pd.read_csv(os.path.join(INPUT_FOLDER, ("output_urls.csv")))
     malformed_urls_df: pd.DataFrame = pd.read_csv(os.path.join(INPUT_FOLDER, ("malformed_urls.csv")))
+    walk_failed_urls_df: pd.DataFrame = pd.read_csv(os.path.join(INPUT_FOLDER, ("walk_failed_urls.csv")))
 
     next_step("Step 2. Scrape each URL.")
     async with async_playwright() as pw_instance:
@@ -90,6 +91,10 @@ async def main():
                 logger.info(f"Skipping URL: {row.url} because the GNIS {row.gnis} is already in the output_urls.csv file")
                 continue
 
+            if row_is_in_this_dataframe(row.gnis, 'gnis', walk_failed_urls_df):
+                logger.info(f"Skipping URL: {row.url} with GNIS {row.gnis} because the previous attempt to walk it failed.")
+                continue
+
             if "%2C" in row.url or "," in row.url or row_is_in_this_dataframe(row.gnis, 'gnis', malformed_urls_df):
                 logger.info(f"Skipping URL: {row.url} because it contains '%2c' or ','. This will produce a 404 if loaded.")
                 append_pandas_row_to_csv(row, "malformed_urls.csv")
@@ -104,6 +109,7 @@ async def main():
             next_step("Step 2.3 Scrape Municode's Table of Contents nested menu, save it to CSV, and return a pandas DataFrame.")
             df = await scraper.scrape_municode_toc_menu(row)
             if df is None:
+                append_pandas_row_to_csv(row, "walk_failed_urls.csv")
                 continue
 
             next_step("Step 2.4 Flatten the nested dataframe.")

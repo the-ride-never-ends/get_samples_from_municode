@@ -138,8 +138,13 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScraper):
 
             # Walk the nested menu and save the results.
             df: pd.DataFrame = await walk.nested_menu(self.NODE_ID_SELECTOR, row)
-            logger.info("Walk of Municode ToC menu finished.")
-            logger.debug(f"df\n{df.head()}",f=True)
+            if df is None or len(df) == 0:
+                logger.warning(f"Selector '{self.NODE_ID_SELECTOR}' was found for {row.url} but could not find menu elements.")
+                await self.screenshot_if_no_menu_elements(row)
+                return None
+            else:
+                logger.info("Walk of Municode ToC menu finished.")
+                logger.debug(f"df\n{df.head()}",f=True)
 
             # Save the HTML from the webpage once the nodes have been expanded.
             logger.info("Nodes expanded successfully.\nGetting HTML...")

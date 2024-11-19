@@ -61,6 +61,17 @@ class ScrapeForDocContent(AsyncPlaywrightScraper):
         super().__init__(**kwargs)
 
 
+    def scrape_for_doc_content(self, df: pd.DataFrame) -> None:
+        len_df = len(df)
+        for idx, row in enumerate(df.itertuples(), start=1):
+            logger.info(f"{idx}/{len_df} - {row.url}")
+            url = row.url
+            gnis = row.gnis
+            self.navigate_to(url, idx=idx)
+
+            
+
+
 
 
 
@@ -138,7 +149,7 @@ async def scrape_for_doc_content() -> None:
         
         urls_df_list = await load_municode_urls_from_mysql_database(db, gnis_df, urls_df_list)
 
-        
+
         for urls_df in urls_df_list:
             pass
 
