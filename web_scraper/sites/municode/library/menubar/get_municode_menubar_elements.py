@@ -5,10 +5,10 @@
 # #main-menu > li.gui-folder.expanded > ul > li > a
 
 
-from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScrapper
+from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScraper
 
 
-def GetMunicodeMenubarElements(AsyncPlaywrightScrapper):
+def GetMunicodeMenubarElements(AsyncPlaywrightScraper):
 
 
     def __init__(self):

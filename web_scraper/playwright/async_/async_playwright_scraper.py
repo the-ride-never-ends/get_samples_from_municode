@@ -50,7 +50,7 @@ def _extract_domain_name_from_url(url: str) -> str:
     return parts[0]
 
 
-class AsyncPlaywrightScrapper:
+class AsyncPlaywrightScraper:
     """
     A Playwright browser class.
 
@@ -177,11 +177,11 @@ class AsyncPlaywrightScrapper:
 
     # Define the context manager methods
     @classmethod
-    async def start(cls, domain, pw_instance, *args, **kwargs) -> 'AsyncPlaywrightScrapper':
+    async def start(cls, domain, pw_instance, *args, **kwargs) -> 'AsyncPlaywrightScraper':
         """
         Factory method to start the scraper.
         """
-        logger.debug("Starting AsyncPlaywrightScrapper via factory method...")
+        logger.debug("Starting AsyncPlaywrightScraper via factory method...")
         instance = cls(domain, pw_instance, *args, **kwargs)
         await instance._get_robot_rules()
         await instance._load_browser()
@@ -199,7 +199,7 @@ class AsyncPlaywrightScrapper:
         return
 
 
-    async def __aenter__(self) -> 'AsyncPlaywrightScrapper':
+    async def __aenter__(self) -> 'AsyncPlaywrightScraper':
         await self._get_robot_rules()
         return await self._load_browser()
 

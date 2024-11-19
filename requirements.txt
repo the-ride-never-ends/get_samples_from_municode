@@ -9,4 +9,7 @@ scipy
 networkx
 matplotlib
 #Graphviz
-#pygraphviz 
+#pygraphviz
+aiomysql
+PyMySQL
+pandas

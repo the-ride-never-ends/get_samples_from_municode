@@ -19,7 +19,7 @@ from playwright.async_api import (
     TimeoutError as AsyncPlaywrightTimeoutError
 )
 
-from scraper.child_classes.playwright.AsyncPlaywrightScrapper import AsyncPlaywrightScrapper
+from scraper.child_classes.playwright.AsyncPlaywrightScraper import AsyncPlaywrightScraper
 
 from utils.shared.limiter_utils.Limiter import Limiter
 from utils.shared.load_from_csv import load_from_csv
@@ -141,7 +141,7 @@ async def check_if_url_is_up(row: NamedTuple,
     return
 
 
-class GetFrontPages(AsyncPlaywrightScrapper):
+class GetFrontPages(AsyncPlaywrightScraper):
     """
     Take a screenshot of a domain's front page.
     """

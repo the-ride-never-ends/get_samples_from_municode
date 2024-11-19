@@ -44,7 +44,7 @@ from development.calculate_stats_for_urls_per_municode_library_page_csv import (
     calculate_stats_for_urls_per_municode_library_page_csv
 )
 
-
+from database.MySqlDatabase import MySqlDatabase
 
 MANUAL_USE = True
 
@@ -54,7 +54,14 @@ async def main():
 
     if MANUAL_USE:
         logger.info("MANUAL_USE ACTIVE: calculate_stats_for_urls_per_municode_library_page_csv")
-        calculate_stats_for_urls_per_municode_library_page_csv()
+        #calculate_stats_for_urls_per_municode_library_page_csv()
+        with MySqlDatabase(database="socialtoolkit") as db:
+            for csv in os.listdir(os.path.join(OUTPUT_FOLDER, "sql_ready_urls")):
+                if csv.endswith("_sql_ready_urls.csv"):
+                    data = pd.read_csv(csv)
+                    logger.debug(f"data: {data}", t=30)
+                await db.async_execute_sql_command
+
         sys.exit(0)
 
     # unnest_csv_step(logger=logger, UNNEST_CSV_ROUTE=True)
@@ -113,7 +120,7 @@ async def main():
 
         await scraper.exit()
 
-    next_step("Step 3. Get the total size of the HTML documents in the HTML directory.")
+    # next_step("Step 3. Get the total size of the HTML documents in the HTML directory.")
 
 
     logger.info(f"End __main__")

@@ -13,7 +13,7 @@ from playwright.async_api import (
 )
 
 
-from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScrapper
+from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScraper
 from .table_of_contents.walk_municode_toc import WalkMunicodeToc
 
 from utils.shared.make_sha256_hash import make_sha256_hash
@@ -28,7 +28,7 @@ from logger.logger import Logger
 logger = Logger(logger_name=__name__)
 
 
-class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
+class ScrapeMunicodeLibraryPage(AsyncPlaywrightScraper):
     """
     Scrape a Municode library page.
     This class is gets 3 important elements from the page:
@@ -161,7 +161,7 @@ class ScrapeMunicodeLibraryPage(AsyncPlaywrightScrapper):
             raise
 
 
-class GetMunicodeSidebarElements(AsyncPlaywrightScrapper):
+class GetMunicodeSidebarElements(AsyncPlaywrightScraper):
     """
     Get the sidebar elements from a Municode URL page.
     """
