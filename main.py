@@ -45,22 +45,30 @@ from development.calculate_stats_for_urls_per_municode_library_page_csv import (
 )
 
 from database.MySqlDatabase import MySqlDatabase
+from scrape_for_doc_content import scrape_for_doc_content
 
-MANUAL_USE = False
+
+MANUAL_USE = True
 
 async def main():
 
     logger.info("Begin __main__")
 
     if MANUAL_USE:
-        logger.info("MANUAL_USE ACTIVE: calculate_stats_for_urls_per_municode_library_page_csv")
+        logger.info("MANUAL_USE ACTIVE: scrape_for_doc_content")
+        await scrape_for_doc_content()
+        sys.exit(0)
+
+
+
+
         #calculate_stats_for_urls_per_municode_library_page_csv()
         with MySqlDatabase(database="socialtoolkit") as db:
             for csv in os.listdir(os.path.join(OUTPUT_FOLDER, "sql_ready_urls")):
                 if csv.endswith("_sql_ready_urls.csv"):
                     data = pd.read_csv(csv)
                     logger.debug(f"data: {data}", t=30)
-                await db.async_execute_sql_command
+
 
         sys.exit(0)
 

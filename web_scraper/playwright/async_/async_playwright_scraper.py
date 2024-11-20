@@ -193,7 +193,7 @@ class AsyncPlaywrightScraper:
         """
         Close any remaining page, context, and browser instances before exit.
         """
-        self.close_current_page_and_context()
+        await self.close_current_page_and_context()
         if self.browser:
             await self.close_browser()
         return

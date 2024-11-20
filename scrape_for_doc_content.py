@@ -55,6 +55,8 @@ logger = Logger(logger_name=__name__)
 
 
 from web_scraper.playwright.async_.async_playwright_scraper import AsyncPlaywrightScraper
+
+
 class ScrapeForDocContent(AsyncPlaywrightScraper):
 
     def __init__(self, **kwargs):
@@ -62,14 +64,16 @@ class ScrapeForDocContent(AsyncPlaywrightScraper):
 
 
     def scrape_for_doc_content(self, df: pd.DataFrame) -> None:
+
         len_df = len(df)
+    
         for idx, row in enumerate(df.itertuples(), start=1):
             logger.info(f"{idx}/{len_df} - {row.url}")
             url = row.url
             gnis = row.gnis
             self.navigate_to(url, idx=idx)
 
-            
+
 
 
 
@@ -110,6 +114,7 @@ async def scrape_for_doc_content() -> None:
     4. Move to next URL in url_list
     """
 
+
     next_step("Step 1: Load unnested URLs from CSV files as pandas dataframes")
     suffix = "_menu_traversal_results_unnested"
     output_suffix = "sql_ready_urls"
@@ -149,6 +154,8 @@ async def scrape_for_doc_content() -> None:
         
         urls_df_list = await load_municode_urls_from_mysql_database(db, gnis_df, urls_df_list)
 
+
+        next_step("""Step 5: DRAW THE REST OF THE FUCKING OWL""", stop=True)
 
         for urls_df in urls_df_list:
             pass
